@@ -1,0 +1,288 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { SELF_READ } from '../../services/studioQueries';
+import { Download, Loader2, PencilLine, Piano, Play, Square, Trash2 } from 'lucide-react';
+import { useI18n } from '../../context/I18nContext';
+import { saveFile } from '../../services/saveFile';
+import { apiUrl } from '../../services/apiBase';
+import { MidiEditor } from './MidiEditor';
+import { MidiPlayer, type HeardNote } from './MidiPlayer';
+import { WorkProgress } from '../WorkProgress';
+
+/**
+ * Audio to MIDI on the tools page, for the track chosen there: a song, a
+ * stem, a processed take. The transcriber and its weights are optional; the
+ * first transcription fetches them, or the user does beforehand.
+ */
+
+interface MidiSize {
+  id: 'small' | 'medium' | 'large';
+  params: string;
+  bytes: number;
+  installed: boolean;
+  missing_bytes: number;
+}
+
+interface MidiRun {
+  song_id: string | null;
+  size: string;
+  stage: 'preparing' | 'downloading' | 'reading' | 'transcribing' | 'done' | 'stopped';
+  chunks_done: number;
+  chunks_total: number;
+  notes: number;
+  started_ms: number;
+  /** How long the run has been going by the service's clock. */
+  elapsed_ms?: number;
+  done: boolean;
+  error: string | null;
+  file: string | null;
+  progress: number;
+  title: string;
+  /** The set this track belongs to, when several were asked for at once. */
+  batch: { done: number; total: number; queued: string[]; failed: string[] } | null;
+}
+
+interface MidiStatus {
+  tool_installed: boolean;
+  sizes: MidiSize[];
+  default_size: MidiSize['id'];
+  download: { downloaded_bytes: number; total_bytes: number; done: boolean; error: string | null } | null;
+  run: MidiRun | null;
+  license: string;
+}
+
+interface SongMidi {
+  file: string;
+  size: string | null;
+  instruments: string[];
+  notes: HeardNote[];
+}
+
+const gigabytes = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`);
+
+export const MidiTool: React.FC<{ songId: string; songTitle: string; card: string }> = ({ songId, songTitle, card }) => {
+  const { t } = useI18n();
+  const tt = t as unknown as (key: string) => string;
+  const [status, setStatus] = useState<MidiStatus | null>(null);
+  const [size, setSize] = useState<MidiSize['id'] | null>(null);
+  const [songMidi, setSongMidi] = useState<SongMidi | null>(null);
+  const [liveNotes, setLiveNotes] = useState<HeardNote[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const cardRef = useRef<HTMLElement | null>(null);
+
+  const run = status?.run?.song_id === songId ? status.run : null;
+  const running = Boolean(run && !run.done);
+  const batch = status?.run?.batch ?? null;
+  const batchActive = Boolean(batch && (batch.queued.length > 0 || !status?.run?.done));
+  const chosen = size ?? status?.default_size ?? 'medium';
+  const chosenSize = status?.sizes.find(entry => entry.id === chosen);
+
+  const loadSongMidi = useCallback(async () => {
+    if (!songId) return setSongMidi(null);
+    const response = await fetch(`/v1/library/songs/${encodeURIComponent(songId)}/midi`);
+    setSongMidi(response.ok ? await response.json() : null);
+  }, [songId]);
+
+  useEffect(() => {
+    void loadSongMidi().catch(() => setSongMidi(null));
+  }, [loadSongMidi]);
+
+  // the MIDI editor saved this track's MIDI
+  useEffect(() => {
+    const changed = (event: Event) => {
+      if ((event as CustomEvent<{ songId: string }>).detail?.songId === songId) void loadSongMidi().catch(() => setSongMidi(null));
+    };
+    window.addEventListener('yue:midi-changed', changed);
+    return () => window.removeEventListener('yue:midi-changed', changed);
+  }, [songId, loadSongMidi]);
+
+  // the state, and while a run of this track is at work, the notes it has heard
+  useEffect(() => {
+    let alive = true;
+    let wasRunning = false;
+    const read = async () => {
+      const next: MidiStatus = await fetch('/v1/midi', { headers: SELF_READ }).then(response => response.json());
+      if (!alive) return;
+      setStatus(next);
+      const mine = next.run?.song_id === songId ? next.run : null;
+      if (mine && !mine.done && mine.stage === 'transcribing') {
+        const body = await fetch('/v1/midi/notes', { headers: SELF_READ }).then(response => response.json());
+        if (alive) setLiveNotes(body.notes ?? []);
+      }
+      if (wasRunning && mine?.done) void loadSongMidi();
+      wasRunning = Boolean(mine && !mine.done);
+    };
+    void read().catch(() => undefined);
+    const timer = window.setInterval(() => void read().catch(() => undefined), 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [songId, loadSongMidi]);
+
+  // the track menu's "To MIDI" lands here
+  useEffect(() => {
+    const focus = () => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.addEventListener('yue:focus-midi', focus);
+    return () => window.removeEventListener('yue:focus-midi', focus);
+  }, []);
+
+  const post = async (path: string, body: object) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => null);
+        throw new Error(problem?.error || `HTTP ${response.status}`);
+      }
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : String(problem));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const transcribe = () => {
+    setLiveNotes([]);
+    void post('/v1/midi/transcribe', { song_id: songId, size: chosen });
+  };
+
+  const remove = async () => {
+    const response = await fetch(`/v1/library/songs/${encodeURIComponent(songId)}/midi`, { method: 'DELETE' });
+    if (response.ok) setSongMidi(null);
+  };
+
+  const download = status?.download && !status.download.done ? status.download : null;
+  const percent = run?.stage === 'downloading' && download
+    ? Math.round((download.downloaded_bytes / Math.max(1, download.total_bytes)) * 100)
+    : run && run.chunks_total > 0
+      ? Math.round(run.progress * 100)
+      : null;
+  const audioUrl = songId ? apiUrl(`/v1/library/media/${encodeURIComponent(songId)}`) : undefined;
+  const missing = chosenSize && (!status?.tool_installed || !chosenSize.installed) ? chosenSize.missing_bytes : 0;
+
+  return (
+    <section ref={cardRef} className={card}>
+      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+        <Piano size={17} className="text-pink-500" /> {t('midiTitle')}
+      </div>
+      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{t('midiHint')}</p>
+
+      <div className="mt-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">{t('midiModel')}</p>
+        <div className="mt-2 flex gap-2">
+          {(status?.sizes ?? []).map(entry => (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => setSize(entry.id)}
+              className={`flex-1 rounded-lg border px-3 py-2 text-left text-xs ${
+                entry.id === chosen ? 'border-pink-400 bg-pink-500/10 text-zinc-900 dark:text-white' : 'border-zinc-200 text-zinc-500 dark:border-white/10'
+              }`}
+            >
+              <span className="block font-semibold">{tt(`midiSize_${entry.id}`)} · {entry.params}</span>
+              <span className="block text-[11px] text-zinc-500">{entry.installed ? t('midiInstalled') : gigabytes(entry.bytes)}</span>
+            </button>
+          ))}
+        </div>
+        {missing > 0 && !running && (
+          <p className="mt-2 text-[11px] leading-4 text-zinc-500">
+            {t('midiFirstUse').replace('{size}', gigabytes(missing))}{' '}
+            <button type="button" onClick={() => void post('/v1/midi/install', { size: chosen })} disabled={busy || Boolean(download)} className="font-semibold text-pink-600 hover:underline disabled:opacity-50 dark:text-pink-400">
+              {t('midiInstallNow')}
+            </button>
+          </p>
+        )}
+        {download && !running && (
+          <p className="mt-2 text-[11px] tabular-nums text-zinc-500">
+            {t('midiDownloading')} {gigabytes(download.downloaded_bytes)} / {gigabytes(download.total_bytes)}
+          </p>
+        )}
+      </div>
+
+      {batch && (
+        <div className="mt-3 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-600 dark:border-white/10 dark:text-zinc-300">
+          <div className="flex min-w-0 items-center gap-2">
+            {batchActive && <Loader2 size={13} className="shrink-0 animate-spin text-pink-500" />}
+            <span className="shrink-0 font-semibold tabular-nums">{t('midiBatchProgress').replace('{done}', String(batch.done)).replace('{total}', String(batch.total))}</span>
+            {batchActive && status?.run?.title && <span className="min-w-0 truncate text-zinc-500">· {status.run.title}</span>}
+            {batchActive && (
+              <button type="button" onClick={() => void post('/v1/midi/cancel', {})} className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-300 px-2 py-1 text-[11px] font-semibold hover:border-pink-400 dark:border-white/15">
+                <Square size={10} /> {t('midiStop')}
+              </button>
+            )}
+          </div>
+          {batch.queued.includes(songId) && <p className="mt-1 text-zinc-500">{t('midiBatchQueuedHere')}</p>}
+          {batch.failed.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-rose-600 wrap-anywhere dark:text-rose-300">
+              {batch.failed.map(line => <li key={line}>{line}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={transcribe}
+          disabled={!songId || running || busy || batchActive}
+          className="inline-flex items-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+          {songMidi ? t('midiAgain') : t('midiStart')}
+        </button>
+        {running && (
+          <button type="button" onClick={() => void post('/v1/midi/cancel', {})} className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-pink-400 dark:border-white/15 dark:text-zinc-200">
+            <Square size={12} /> {t('midiStop')}
+          </button>
+        )}
+        {songMidi && !running && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 dark:border-white/15 dark:text-zinc-200"
+            >
+              <PencilLine size={13} /> {tt('midiEdEdit')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveFile(`${songTitle || 'track'}.mid`, { url: apiUrl(`/v1/library/songs/${encodeURIComponent(songId)}/midi/file`) })}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 dark:border-white/15 dark:text-zinc-200"
+            >
+              <Download size={13} /> {t('midiSave')}
+            </button>
+            <button type="button" onClick={() => void remove()} className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-500 hover:border-rose-400 hover:text-rose-600 dark:border-white/10">
+              <Trash2 size={13} /> {t('midiDelete')}
+            </button>
+          </>
+        )}
+      </div>
+
+      {running && run && <WorkProgress label={tt(`midiStage_${run.stage}`)} percent={percent} elapsedMs={run.elapsed_ms} />}
+
+      {running && run?.stage === 'transcribing' && (
+        <MidiPlayer key={`live-${songId}`} notes={liveNotes} sourceAudioUrl={audioUrl} live chunks={{ done: run.chunks_done, total: run.chunks_total }} />
+      )}
+      {!running && songMidi && (
+        <>
+          <p className="mt-3 select-text text-[11px] text-zinc-500 wrap-anywhere">
+            {songMidi.size ? `${tt(`midiSize_${songMidi.size}`)} · ` : ''}{songMidi.instruments.length} {t('midiInstruments')} · {songMidi.file}
+          </p>
+          <MidiPlayer key={`done-${songId}-${songMidi.notes.length}`} notes={songMidi.notes} sourceAudioUrl={audioUrl} live={false} />
+        </>
+      )}
+
+      {!running && run?.stage === 'stopped' && !error && (
+        <p className="mt-3 text-xs text-zinc-500">{t('midiStopped')}</p>
+      )}
+      {(run?.error || error) && (
+        <p role="alert" className="mt-3 select-text rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-700 wrap-anywhere dark:text-rose-300">{run?.error || error}</p>
+      )}
+      <p className="mt-3 text-[11px] leading-4 text-zinc-400">{t('midiLicense')}</p>
+      {editing && <MidiEditor source={{ kind: 'track', songId, title: songTitle }} onClose={() => setEditing(false)} />}
+    </section>
+  );
+};

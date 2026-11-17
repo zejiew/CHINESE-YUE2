@@ -1,0 +1,476 @@
+import React, { useState, useEffect } from 'react';
+import { Newspaper, X, Star, FileText } from 'lucide-react';
+import { SiGithub } from '@icons-pack/react-simple-icons';
+import { useI18n } from '../context/I18nContext';
+import newsData from '../data/news.json';
+import { hubStateChanged, useHubState } from '../services/studioQueries';
+import { hubMediaUrl, hubText, reportLinkClick, reportNotice, type HubButton, type HubItem } from '../services/studioHub';
+import { openExternal } from '../services/externalLinks';
+import changelogData from '../data/changelog.json';
+
+type TabId = 'news' | 'changelog';
+
+interface NewsLink {
+  label: string;
+  url: string;
+}
+
+type LocalizedString = string | Record<string, string>;
+
+interface NewsItem {
+  id: string;
+  date: string;
+  title: LocalizedString;
+  body: LocalizedString;
+  tags?: string[];
+  links?: NewsLink[];
+  /** A hub item's picture, its buttons in the window's language, and its ad label. */
+  image?: string;
+  buttons?: HubButton[];
+  ad?: HubItem['ad'];
+}
+
+// ── Changelog parser ─────────────────────────────────────────────────
+
+interface ChangelogEntry {
+  date: string;
+  sections: { title: string; items: string[] }[];
+}
+
+/** Links in news text made clickable: https:// addresses and bare domains with a path (dalink.to/...). */
+function withLinks(text: string, key: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const re = /(https?:\/\/[^\s]+|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\/[^\s]+)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const url = m[0];
+    const href = /^https?:\/\//.test(url) ? url : `https://${url}`;
+    parts.push(
+      <a key={`${key}-${m.index}`} href={href} target="_blank" rel="noopener noreferrer"
+         className="text-blue-600 dark:text-blue-400 hover:underline break-all">
+        {url}
+      </a>
+    );
+    last = m.index + url.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+/** News text with **bold** and *italic* words, [named](https://...) links and bare links. */
+function inline(text: string, key: string): React.ReactNode[] {
+  return text.split(/(\[[^\]]+\]\(https:\/\/[^)\s]+\)|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/).flatMap<React.ReactNode>((piece, index) => {
+    const named = /^\[([^\]]+)\]\((https:\/\/[^)\s]+)\)$/.exec(piece);
+    if (named) {
+      return [<a key={`${key}-a${index}`} href={named[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{named[1]}</a>];
+    }
+    if (piece.length > 2 && piece.startsWith('*') && piece.endsWith('*') && !piece.startsWith('**')) {
+      return [<em key={`${key}-i${index}`}>{piece.slice(1, -1)}</em>];
+    }
+    return inlineBold(piece, `${key}-${index}`);
+  });
+}
+
+function inlineBold(text: string, key: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/).flatMap<React.ReactNode>((piece, index) =>
+    piece.length > 4 && piece.startsWith('**') && piece.endsWith('**')
+      ? [<strong key={`${key}-b${index}`} className="font-semibold text-zinc-800 dark:text-zinc-200">{piece.slice(2, -2)}</strong>]
+      : withLinks(piece, `${key}-${index}`),
+  );
+}
+
+/** A news body: paragraphs apart by an empty line; a paragraph of "- " lines is a list. */
+const NewsBody: React.FC<{ text: string }> = ({ text }) => (
+  <div className="mt-3 space-y-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+    {text.split(/\n\s*\n/).map((block, index) => {
+      const lines = block.split('\n').filter((line) => line.trim());
+      if (lines.length && lines.every((line) => line.trimStart().startsWith('- '))) {
+        return (
+          <ul key={index} className="list-disc space-y-1.5 pl-5 marker:text-zinc-400 dark:marker:text-zinc-500">
+            {lines.map((line, at) => <li key={at}>{inline(line.trimStart().slice(2), `${index}-${at}`)}</li>)}
+          </ul>
+        );
+      }
+      return <p key={index} className="whitespace-pre-line">{inline(block, String(index))}</p>;
+    })}
+  </div>
+);
+
+function parseChangelog(raw: string): ChangelogEntry[] {
+  const entries: ChangelogEntry[] = [];
+  let current: ChangelogEntry | null = null;
+  let currentSection: { title: string; items: string[] } | null = null;
+
+  for (const line of raw.split('\n')) {
+    const dateMatch = line.match(/^## (\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) {
+      if (current) entries.push(current);
+      current = { date: dateMatch[1], sections: [] };
+      currentSection = null;
+      continue;
+    }
+
+    const sectionMatch = line.match(/^### (.+)/);
+    if (sectionMatch && current) {
+      currentSection = { title: sectionMatch[1], items: [] };
+      current.sections.push(currentSection);
+      continue;
+    }
+
+    const itemMatch = line.match(/^- (.+)/);
+    if (itemMatch && currentSection) {
+      currentSection.items.push(itemMatch[1]);
+    }
+  }
+  if (current) entries.push(current);
+  return entries;
+}
+
+function sectionColor(title: string): string {
+  switch (title.toLowerCase()) {
+    case 'added': return 'text-green-400';
+    case 'changed': return 'text-amber-400';
+    case 'fixed': return 'text-blue-400';
+    case 'removed': return 'text-red-400';
+    default: return 'text-zinc-400';
+  }
+}
+
+function sectionBadgeColor(title: string): string {
+  switch (title.toLowerCase()) {
+    case 'added': return 'bg-green-500/15 text-green-600 dark:text-green-400';
+    case 'changed': return 'bg-amber-500/15 text-amber-600 dark:text-amber-400';
+    case 'fixed': return 'bg-blue-500/15 text-blue-600 dark:text-blue-400';
+    case 'removed': return 'bg-red-500/15 text-red-600 dark:text-red-400';
+    default: return 'bg-zinc-200 dark:bg-white/10 text-zinc-500';
+  }
+}
+
+// ── Changelog Tab ────────────────────────────────────────────────────
+
+const ChangelogTab: React.FC = () => {
+  const { t } = useI18n();
+
+  // Written by scripts/changelog.mjs straight from the repository history, so
+  // this page cannot drift from what was actually shipped. It used to fetch
+  // /api/changelog from a backend this fork does not have.
+  const days = changelogData as Array<{ date: string; items: Array<{ hash: string; subject: string; body: string }> }>;
+
+  if (days.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-sm text-zinc-500">{t('changelogLoading')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {days.map((day, index) => (
+        <div key={day.date} className="rounded-2xl border border-zinc-200 bg-white dark:border-white/5 dark:bg-suno-card">
+          <div className="p-5 sm:p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{day.date}</span>
+              {index === 0 && (
+                <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
+                  {t('changelogLatest')}
+                </span>
+              )}
+              <span className="ml-auto text-xs tabular-nums text-zinc-400">{day.items.length}</span>
+            </div>
+
+            <ul className="space-y-2.5">
+              {day.items.map((item) => (
+                <li key={item.hash} className="flex gap-2.5">
+                  <code className="mt-0.5 shrink-0 rounded-sm bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 dark:bg-white/5 dark:text-zinc-400">
+                    {item.hash}
+                  </code>
+                  <div className="min-w-0">
+                    <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{item.subject}</p>
+                    {item.body && <p className="mt-0.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{item.body}</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export const NewsPage: React.FC<{ onOpen?: (target: NonNullable<HubButton['target']>) => void }> = ({ onOpen }) => {
+  const { t, language } = useI18n();
+  const [activeTab, setActiveTab] = useState<TabId>('news');
+
+  const localize = (value: LocalizedString): string => {
+    if (typeof value === 'string') return value;
+    return value[language] || value['en'] || Object.values(value)[0] || '';
+  };
+
+  const [dismissedNews, setDismissedNews] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('ace-dismissed-news');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // News from the hub come first: new ones reach every studio without a new release; the bundled ones follow.
+  const hub = useHubState(language);
+  const hubNews: NewsItem[] = (hub.data?.items ?? [])
+    .filter((item: HubItem) => item.kind === 'news')
+    .map((item: HubItem) => ({
+      id: `hub:${item.id}`,
+      date: item.date ?? '',
+      title: Object.fromEntries(Object.entries(item.content).map(([lang, text]) => [lang, text.title])),
+      body: Object.fromEntries(Object.entries(item.content).map(([lang, text]) => [lang, text.body])),
+      image: item.image ?? undefined,
+      buttons: hubText(item, language)?.buttons ?? [],
+      ad: item.ad,
+    }));
+  const bundledIds = new Set((newsData as NewsItem[]).map((n) => n.id));
+  // the hub's items stand among the studio's own release notes, newest first
+  const allNews = [...hubNews.filter((n) => !bundledIds.has(n.id.slice(4))), ...(newsData as NewsItem[])]
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const activeNews = allNews.filter(n => !dismissedNews.has(n.id));
+  const dismissed = allNews.filter(n => dismissedNews.has(n.id));
+
+  // the hub's news count as its notices do: seen once a launch, clicks by button or link, closes
+  const hubId = (id: string) => (id.startsWith('hub:') ? id.slice(4) : null);
+  const hubShown = activeNews.map(n => hubId(n.id)).filter((id): id is string => id !== null).join(',');
+  useEffect(() => {
+    for (const id of hubShown ? hubShown.split(',') : []) reportNotice(id, 'shown').catch(error => console.warn('[hub] news shown not recorded:', error));
+  }, [hubShown]);
+  const hubClicked = (id: string, button: string) => {
+    const hub = hubId(id);
+    if (hub) reportNotice(hub, 'clicked', button).catch(error => console.warn('[hub] news click not recorded:', error)).finally(hubStateChanged);
+  };
+
+  const dismissNewsItem = (id: string) => {
+    const hub = hubId(id);
+    if (hub) reportNotice(hub, 'dismissed').catch(error => console.warn('[hub] news close not recorded:', error)).finally(hubStateChanged);
+    setDismissedNews(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem('ace-dismissed-news', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const restoreNewsItem = (id: string) => {
+    setDismissedNews(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      localStorage.setItem('ace-dismissed-news', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const tagColor = (tag: string) => {
+    switch (tag) {
+      case 'experimental': return 'bg-amber-500/15 text-amber-600 dark:text-amber-400';
+      case 'backend': return 'bg-blue-500/15 text-blue-600 dark:text-blue-400';
+      case 'training': return 'bg-purple-500/15 text-purple-600 dark:text-purple-400';
+      case 'release': return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400';
+      case 'feature': return 'bg-green-500/15 text-green-600 dark:text-green-400';
+      case 'bugfix': return 'bg-red-500/15 text-red-600 dark:text-red-400';
+      default: return 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-zinc-400';
+    }
+  };
+
+  const renderCard = (item: NewsItem, isDismissed: boolean) => (
+    <div
+      key={item.id}
+      className={`
+        group rounded-2xl border transition-all duration-200
+        ${isDismissed
+          ? 'bg-zinc-100 dark:bg-white/2 border-zinc-200 dark:border-white/5 opacity-50'
+          : 'bg-white dark:bg-suno-card border-zinc-200 dark:border-white/5 hover:border-zinc-300 dark:hover:border-white/10'
+        }
+      `}
+    >
+      <div className="p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100 leading-snug">
+              {localize(item.title)}
+            </h3>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{item.date}</p>
+          </div>
+          {!isDismissed ? (
+            <button
+              onClick={() => dismissNewsItem(item.id)}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition-all shrink-0"
+              title={t('dismiss')}
+            >
+              <X size={16} />
+            </button>
+          ) : (
+            <button
+              onClick={() => restoreNewsItem(item.id)}
+              className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:underline transition-colors shrink-0"
+            >
+              {t('restore')}
+            </button>
+          )}
+        </div>
+
+        {item.image && <img src={hubMediaUrl(item.image)} alt="" className="mt-3 max-h-64 w-full rounded-xl object-cover" />}
+
+        <div onClickCapture={event => { const hub = hubId(item.id); if (hub) reportLinkClick(hub, event.target, event.currentTarget, hubStateChanged); }}>
+          <NewsBody text={localize(item.body)} />
+        </div>
+
+        {item.ad?.label && <p className="mt-2 text-xs text-zinc-400">{t('hubAd')}{item.ad.erid ? ` · erid ${item.ad.erid}` : ''}</p>}
+
+        {item.buttons && item.buttons.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {item.buttons.map((button, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => {
+                  if (button.action === 'dismiss') {
+                    dismissNewsItem(item.id);
+                    return;
+                  }
+                  hubClicked(item.id, `b${index}`);
+                  if (button.action === 'url' && button.url) void openExternal(button.url);
+                  if (button.action === 'open' && button.target) onOpen?.(button.target);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
+              >
+                {button.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {item.links && item.links.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {item.links.map((link, index) => (
+              <a
+                key={link.url}
+                href={link.url}
+                onClick={() => hubClicked(item.id, `b${index}`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
+              >
+                {link.label}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            ))}
+          </div>
+        )}
+
+        {item.tags && item.tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            {item.tags.map(tag => (
+              <span
+                key={tag}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${tagColor(tag)}`}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 bg-white dark:bg-black overflow-y-auto p-6 lg:p-10 pb-32 transition-colors duration-300">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+            <Newspaper size={20} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t('news')}</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('newsSubtitle')}</p>
+          </div>
+        </div>
+
+        {/* Tab Bar */}
+        <div className="flex gap-1 mb-6">
+          <button
+            onClick={() => setActiveTab('news')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'news'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+            }`}
+          >
+            <Newspaper size={14} />
+            {t('news')}
+          </button>
+          <button
+            onClick={() => setActiveTab('changelog')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'changelog'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+            }`}
+          >
+            <FileText size={14} />
+            {t('changelog')}
+          </button>
+        </div>
+
+        {/* Star Repo */}
+        <a
+          href="https://github.com/timoncool/YuE2-Studio"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 mb-6 px-5 py-4 rounded-2xl border border-zinc-200 dark:border-white/5 bg-white dark:bg-suno-card hover:border-zinc-300 dark:hover:border-white/10 transition-all group"
+        >
+          <SiGithub size={20} className="text-zinc-500 dark:text-zinc-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">timoncool/YuE2-Studio</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('starRepo')}</p>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-zinc-300 text-sm font-medium group-hover:bg-amber-500/15 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors shrink-0">
+            <Star size={14} />
+            Star
+          </div>
+        </a>
+
+        {/* Tab Content */}
+        {activeTab === 'news' && (
+          <>
+            {activeNews.length > 0 ? (
+              <div className="space-y-4">
+                {activeNews.map(item => renderCard(item, false))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <Newspaper size={48} className="mx-auto text-zinc-300 dark:text-zinc-600 mb-4" />
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm">{t('noNewUpdates')}</p>
+              </div>
+            )}
+
+            {dismissed.length > 0 && (
+              <div className="mt-10">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-4">
+                  {t('dismissed')}
+                </h2>
+                <div className="space-y-3">
+                  {dismissed.map(item => renderCard(item, true))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'changelog' && <ChangelogTab />}
+      </div>
+    </div>
+  );
+};

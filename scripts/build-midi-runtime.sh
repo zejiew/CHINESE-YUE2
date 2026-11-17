@@ -1,0 +1,46 @@
+#!/bin/bash
+# macOS counterpart of the Windows music-midi.exe and ace-caption.exe: builds
+# HOT-Step's `ace-midi` (MuScriptor audio-to-MIDI) and `ace-caption` (MOSS-Music,
+# Style by ear) at the pinned commit with Metal, and copies them as `music-midi`
+# and `music-caption`, with their ggml libraries, into OUTPUT_DIRECTORY.
+set -euo pipefail
+
+output="${1:?usage: build-midi-runtime.sh OUTPUT_DIRECTORY}"
+root="$(cd "$(dirname "$0")/.." && pwd)"
+source_file="$root/engines/music-midi-source.json"
+repository="$(sed -n 's/.*"repository": "\(.*\)".*/\1/p' "$source_file")"
+commit="$(sed -n 's/.*"commit": "\(.*\)".*/\1/p' "$source_file")"
+worktree="${YUE_ENGINE_BUILD_ROOT:-${TMPDIR:-/tmp}}/hot-step-engine"
+
+if [ ! -d "$worktree/.git" ]; then
+    git clone "$repository" "$worktree"
+fi
+git -C "$worktree" fetch --quiet origin "$commit" || git -C "$worktree" fetch --quiet origin
+git -C "$worktree" checkout --quiet "$commit"
+# ggml whole; of the VST3 SDK only what the engine's hosting library compiles -
+# its documentation and examples are submodules that do not always resolve
+git -C "$worktree" submodule update --init --recursive engine/ggml
+git -C "$worktree" submodule update --init engine/vendor/vst3sdk
+git -C "$worktree/engine/vendor/vst3sdk" submodule update --init base pluginterfaces public.sdk
+
+cmake -S "$worktree/engine" -B "$worktree/engine/build" -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16 -DGGML_LLAMAFILE=ON \
+    -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DCMAKE_INSTALL_RPATH=@executable_path \
+    -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON
+cmake --build "$worktree/engine/build" --config Release --target ace-midi ace-caption \
+    -j "$(getconf _NPROCESSORS_ONLN)"
+
+mkdir -p "$output"
+cp "$worktree/engine/build/ace-midi" "$output/music-midi"
+cp "$worktree/engine/build/ace-caption" "$output/music-caption"
+cp -a "$worktree"/engine/build/*.dylib "$output/"
+# the binaries look for their dylibs beside themselves: an absolute build-machine path would only resolve on the runner
+for binary in "$output"/*; do
+    [ -f "$binary" ] && [ ! -L "$binary" ] || continue
+    if otool -l "$binary" | grep -A2 LC_RPATH | grep -q ' path /'; then
+        echo "[ERROR] $binary keeps an absolute rpath:" >&2
+        otool -l "$binary" | grep -A2 LC_RPATH >&2
+        exit 1
+    fi
+done
+echo "music-midi and music-caption ($commit) built into $output"

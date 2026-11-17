@@ -1,0 +1,386 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { BarChart3, Boxes, Bug, Cloud, Cpu, Image as ImageIcon, Info, Monitor, Plug, User as UserIcon, X } from 'lucide-react';
+import { SiGithub } from '@icons-pack/react-simple-icons';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../context/I18nContext';
+import { LANGUAGE_NAMES, type Language } from '../i18n/translations';
+import { ProviderSettings } from './ProviderSettings';
+import { EngineSettings } from './EngineSettings';
+import { SetupGate } from './SetupGate';
+import { CoverTemplateSettings } from './CoverTemplateSettings';
+import { AgentPanel } from './AgentPanel';
+import { FileTagSettings } from './FileTagSettings';
+import { HubSettings } from './HubSettings';
+import { STUDIO_REPO_URL, STUDIO_SITE_URL, type ReportFacts } from '../services/issueReport';
+import { ProblemReportDialog } from './ProblemReportDialog';
+import { ABOUT_HEADING, ABOUT_LINK, AuthorLinks } from './AuthorLinks';
+import { SupportAuthor } from './SupportAuthor';
+import { useSetupStatus } from '../services/studioQueries';
+import { onSidebarExtras, setSidebarExtras, sidebarExtras, type SidebarExtras } from '../services/playerPanels';
+import { setUiScale, storedUiScale, UI_SCALE_EVENT, UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP } from '../services/uiScale';
+
+/**
+ * Settings.
+ *
+ * This began as one long scroll of unrelated panels, where finding the engine
+ * flags meant scrolling past the display name and the language picker. It is a
+ * two-pane dialog now: sections on the left, one at a time on the right,
+ * grouped by what a setting actually governs - what runs on this machine, what
+ * runs in the cloud, the two optional extras, and the interface.
+ */
+
+/// The assistant and the karaoke recogniser are not sections of their own: they
+/// are set up where they are installed, on the models page. Having both was one
+/// capability drawn twice, and the two drawings disagreed.
+type SectionId = 'account' | 'models' | 'engine' | 'cloud' | 'agent' | 'covers' | 'interface' | 'privacy' | 'about';
+
+const INPUT =
+  'w-full rounded-lg border-2 border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 outline-hidden focus:border-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white';
+
+interface SettingsModalProps {
+  isOpen: boolean;
+  /// Which page to land on, when the caller has one in mind.
+  initialSection?: string | null;
+  onClose: () => void;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, initialSection, onClose, theme, onToggleTheme }) => {
+  const { user, setDisplayName } = useAuth();
+  const { t, language, setLanguage } = useI18n();
+  const [section, setSection] = useState<SectionId>('account');
+  const reportFacts = useSetupStatus<ReportFacts>().data;
+  const [reporting, setReporting] = useState(false);
+  /// A part of the page to open at, after a colon: `models:assistant`.
+  const [focus, setFocus] = useState<string | null>(null);
+  // Opened from somewhere with a page in mind - the profile line, say.
+  useEffect(() => {
+    // Only a section that exists. Two of them were removed - the assistant and
+    // karaoke are set up where they are installed now - and a button still
+    // pointed at one, which silently opened whatever was first instead.
+    const [page, part] = (initialSection ?? '').split(':');
+    if (page && sections.some((entry) => entry.id === page)) {
+      setSection(page as SectionId);
+      setFocus(part || null);
+    }
+  }, [initialSection]);
+  const [showLangInfo, setShowLangInfo] = useState(false);
+  const langInfoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showLangInfo) return;
+    const handleClick = (event: MouseEvent) => {
+      if (langInfoRef.current && !langInfoRef.current.contains(event.target as Node)) setShowLangInfo(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showLangInfo]);
+
+  if (!isOpen) return null;
+
+  const sections: Array<{ id: SectionId; label: string; hint: string; icon: React.ReactNode }> = [
+    { id: 'account', label: t('account'), hint: t('accountSectionHint'), icon: <UserIcon size={16} /> },
+    { id: 'models', label: t('modelsSection'), hint: t('modelsSectionHint'), icon: <Boxes size={16} /> },
+    { id: 'engine', label: t('localEngine'), hint: t('engineSectionHint'), icon: <Cpu size={16} /> },
+    { id: 'cloud', label: t('providers'), hint: t('cloudSectionHint'), icon: <Cloud size={16} /> },
+    { id: 'agent', label: t('agentSection'), hint: t('agentSectionHint'), icon: <Plug size={16} /> },
+    { id: 'covers', label: t('coversSection'), hint: t('coversSectionHint'), icon: <ImageIcon size={16} /> },
+    { id: 'interface', label: t('appearance'), hint: t('interfaceSectionHint'), icon: <Monitor size={16} /> },
+    { id: 'privacy', label: t('privacySection'), hint: t('privacySectionHint'), icon: <BarChart3 size={16} /> },
+    { id: 'about', label: t('about'), hint: t('aboutSectionHint'), icon: <Info size={16} /> },
+  ];
+
+  const active = sections.find((entry) => entry.id === section) ?? sections[0];
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="flex h-[calc(var(--vh)*85)] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <nav className="hidden w-60 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50 p-3 dark:border-white/5 dark:bg-black/20 sm:flex">
+          <h2 className="px-2 pb-3 pt-2 text-lg font-bold text-zinc-900 dark:text-white">{t('settings')}</h2>
+          <div className="space-y-1">
+            {sections.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => setSection(entry.id)}
+                className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                  section === entry.id
+                    ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white'
+                    : 'text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:bg-white/5'
+                }`}
+              >
+                <span className="mt-0.5 shrink-0">{entry.icon}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{entry.label}</span>
+                  <span className="block truncate text-[11px] text-zinc-500 dark:text-zinc-400">{entry.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-white/5">
+            <div className="min-w-0">
+              <h3 className="truncate text-lg font-bold text-zinc-900 dark:text-white">{active.label}</h3>
+              <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{active.hint}</p>
+            </div>
+            <button onClick={onClose} className="rounded-full p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/5">
+              <X size={20} className="text-zinc-500" />
+            </button>
+          </div>
+
+          {/* On a narrow window the sections become a row of chips. */}
+          <div className="flex gap-1 overflow-x-auto border-b border-zinc-200 px-3 py-2 dark:border-white/5 sm:hidden">
+            {sections.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => setSection(entry.id)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${section === entry.id ? 'bg-zinc-900 text-white dark:bg-white dark:text-black' : 'bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300'}`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            {section === 'account' && (
+              <div className="max-w-lg space-y-2">
+                <label className="text-sm text-zinc-500 dark:text-zinc-400">{t('username')}</label>
+                <input defaultValue={user.username} onBlur={(event) => setDisplayName(event.target.value)} className={INPUT} />
+                <p className="text-xs text-zinc-400">{t('displayNameHint')}</p>
+              </div>
+            )}
+
+            {/* The same chooser as the first run, because it is the same
+                decision - only now nothing is waiting on it. */}
+            {section === 'covers' && <CoverTemplateSettings />}
+            {section === 'models' && <div className="-m-6"><SetupGate mode="settings" focus={focus} /></div>}
+            {section === 'engine' && <EngineSettings />}
+            {section === 'cloud' && <ProviderSettings />}
+            {section === 'agent' && <AgentPanel />}
+            {section === 'privacy' && <div className="space-y-8"><HubSettings /><FileTagSettings /></div>}
+
+            {section === 'interface' && (
+              <div className="max-w-lg space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t('language')}</span>
+                    <div className="relative" ref={langInfoRef}>
+                      <button
+                        onClick={() => setShowLangInfo(!showLangInfo)}
+                        className="rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-white/10 dark:hover:text-zinc-300"
+                      >
+                        <Info size={14} />
+                      </button>
+                      {showLangInfo && (
+                        <div className="absolute left-0 top-8 z-10 w-64 rounded-xl border border-zinc-200 bg-white p-3 shadow-xl dark:border-zinc-700 dark:bg-zinc-800">
+                          <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">{t('localizedBy')}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            <a href="https://x.com/bdsqlsz" target="_blank" rel="noopener noreferrer" className="rounded-lg bg-black px-2.5 py-1.5 text-xs font-medium text-white dark:bg-white dark:text-black">@bdsqlsz</a>
+                            <a href="https://space.bilibili.com/219296" target="_blank" rel="noopener noreferrer" className="rounded-lg bg-[#00A1D6] px-2.5 py-1.5 text-xs font-medium text-white">青龙圣者</a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <select value={language} onChange={(event) => setLanguage(event.target.value as Language)} className={INPUT}>
+                    {(Object.entries(LANGUAGE_NAMES) as [Language, string][]).map(([code, name]) => (
+                      <option key={code} value={code} lang={code}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-3">
+                  <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t('appearance')}</span>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={theme === 'dark' ? onToggleTheme : undefined}
+                      className={`flex-1 rounded-lg border-2 px-4 py-3 font-medium transition-colors ${theme === 'light' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-zinc-300 dark:border-zinc-700'}`}
+                    >
+                      {t('light')}
+                    </button>
+                    <button
+                      onClick={theme === 'light' ? onToggleTheme : undefined}
+                      className={`flex-1 rounded-lg border-2 px-4 py-3 font-medium transition-colors ${theme === 'dark' ? 'border-indigo-500 bg-indigo-950 text-indigo-300' : 'border-zinc-300 dark:border-zinc-700'}`}
+                    >
+                      {t('dark')}
+                    </button>
+                  </div>
+                </div>
+
+                <UiScaleSetting />
+
+                <SidebarExtrasSetting />
+
+                <NetworkAccessSetting />
+              </div>
+            )}
+
+            {section === 'about' && (
+              <div className="max-w-xl space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
+                <div className="space-y-0.5">
+                  <p className="text-zinc-900 dark:text-white">YuE2 Studio · {t('version')} {__APP_VERSION__}</p>
+                  <p className="text-xs">{t('localAIMusicGenerator')}</p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button type="button" onClick={() => setReporting(true)} className={ABOUT_LINK}><Bug size={14} aria-hidden="true" />{t('problemTitle')}</button>
+                    <a href={STUDIO_REPO_URL} target="_blank" rel="noopener noreferrer" className={ABOUT_LINK}><SiGithub size={14} aria-hidden="true" />GitHub</a>
+                    {reporting && <ProblemReportDialog facts={reportFacts} onClose={() => setReporting(false)} />}
+                  </div>
+                </div>
+
+                <section aria-labelledby="about-author" className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-700/50">
+                  <div className="flex items-baseline gap-2 whitespace-nowrap">
+                    <h4 id="about-author" className={ABOUT_HEADING}>{t('aboutAuthor')}</h4>
+                    <p className="font-medium text-zinc-900 dark:text-white">Nerual Dreming</p>
+                  </div>
+                  <p className="text-xs leading-5">{t('aboutAuthorLede')}</p>
+                  <AuthorLinks />
+                </section>
+
+                <section aria-labelledby="about-support" className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-700/50">
+                  <h4 id="about-support" className={ABOUT_HEADING}>{t('supportTheAuthor')}</h4>
+                  <p className="text-xs leading-5">{t('supportLine')}</p>
+                  <SupportAuthor donatePage={`${STUDIO_SITE_URL}donate.html`} />
+                </section>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end border-t border-zinc-200 px-6 py-4 dark:border-white/5">
+            <button onClick={onClose} className="rounded-lg bg-zinc-900 px-6 py-2 font-semibold text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
+              {t('done')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Which of the player's extras the sidebar keeps: the player bar has them all. */
+/** How large the whole interface is drawn; Ctrl with plus, minus and nought changes the same setting. */
+const UiScaleSetting: React.FC = () => {
+  const { t } = useI18n();
+  const [scale, setScale] = React.useState(storedUiScale);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    const onScale = (event: Event) => setScale((event as CustomEvent<number>).detail);
+    window.addEventListener(UI_SCALE_EVENT, onScale);
+    return () => window.removeEventListener(UI_SCALE_EVENT, onScale);
+  }, []);
+  const change = (next: number) => {
+    setError(null);
+    setScale(next);
+    setUiScale(next).catch((problem) => setError(problem instanceof Error ? problem.message : String(problem)));
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t('uiScale')}</span>
+        <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">{scale} %</span>
+      </div>
+      <input
+        type="range"
+        min={UI_SCALE_MIN}
+        max={UI_SCALE_MAX}
+        step={UI_SCALE_STEP}
+        value={scale}
+        onChange={(event) => change(Number(event.target.value))}
+        aria-label={t('uiScale')}
+        className="w-full accent-pink-500"
+      />
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('uiScaleHint')}</p>
+      {error && <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+    </div>
+  );
+};
+
+const SidebarExtrasSetting: React.FC = () => {
+  const { t } = useI18n();
+  const [extras, setExtras] = React.useState(sidebarExtras);
+  React.useEffect(() => onSidebarExtras(setExtras), []);
+  const row = (key: keyof SidebarExtras, label: string) => (
+    <label key={key} className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200">
+      <input type="checkbox" checked={extras[key]} onChange={(event) => setSidebarExtras({ [key]: event.target.checked })} className="accent-pink-500" />
+      {label}
+    </label>
+  );
+  return (
+    <div className="space-y-2">
+      <span className="text-sm font-semibold text-zinc-900 dark:text-white">{t('sidebarExtras')}</span>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('sidebarExtrasHint')}</p>
+      {row('winamp', t('winampTitle'))}
+      {row('equalizer', t('eqTitle'))}
+      {row('visualizer', t('vizTitle'))}
+    </div>
+  );
+};
+
+interface NetworkStatus {
+  enabled: boolean;
+  key: string | null;
+  listening: boolean;
+  addresses: string[];
+  port: number;
+}
+
+/**
+ * The studio from another computer's browser: off by default, on with a key.
+ * The address is bound when the studio starts, so a change asks for a restart.
+ */
+const NetworkAccessSetting: React.FC = () => {
+  const { t } = useI18n();
+  const [status, setStatus] = React.useState<NetworkStatus | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    void fetch('/v1/network').then(response => (response.ok ? response.json() : null)).then(setStatus).catch(() => undefined);
+  }, []);
+  const change = async (body: { enabled?: boolean; new_key?: boolean }) => {
+    setError(null);
+    try {
+      const response = await fetch('/v1/network', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const answer = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(answer?.error || `HTTP ${response.status}`);
+      setStatus(answer);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
+  // the key comes only to the studio's own computer, where the setting is changed
+  if (!status || status.key === null) return null;
+  const links = status.key ? status.addresses.map(address => `http://${address}:${status.port}/?key=${status.key}`) : [];
+  const restart = status.enabled !== status.listening;
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+        <input type="checkbox" checked={status.enabled} onChange={event => void change({ enabled: event.target.checked })} className="accent-pink-500" />
+        {t('networkAccess')}
+      </label>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('networkAccessHint')}</p>
+      {restart && <p className="text-xs text-amber-600 dark:text-amber-300">{t('networkAccessRestart')}</p>}
+      {status.enabled && status.key && (
+        <div className="space-y-1.5 rounded-lg border border-zinc-200 p-2 text-xs dark:border-white/10">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-zinc-500">{t('networkAccessKey')}</span>
+            <code className="min-w-0 flex-1 truncate font-mono text-zinc-800 dark:text-zinc-100">{status.key}</code>
+            <button type="button" onClick={() => void change({ new_key: true })} className="shrink-0 rounded-md border border-zinc-200 px-2 py-0.5 hover:border-pink-400 hover:text-pink-600 dark:border-white/10">{t('networkAccessNewKey')}</button>
+          </div>
+          {links.map(link => (
+            <div key={link} className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate font-mono text-zinc-600 dark:text-zinc-300">{link}</code>
+              <button type="button" onClick={() => void navigator.clipboard.writeText(link)} className="shrink-0 rounded-md border border-zinc-200 px-2 py-0.5 hover:border-pink-400 hover:text-pink-600 dark:border-white/10">{t('copy')}</button>
+            </div>
+          ))}
+          <p className="text-zinc-500">{t('networkAccessInternet')}</p>
+        </div>
+      )}
+      {error && <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+    </div>
+  );
+};

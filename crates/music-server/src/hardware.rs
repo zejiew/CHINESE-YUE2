@@ -1,0 +1,659 @@
+//! The machine the studio runs on: its GPU, how much memory it has, and the
+//! model set that fits in it.
+
+#[cfg(not(any(windows, target_os = "macos")))]
+use std::path::PathBuf;
+use std::{process::Command, sync::OnceLock};
+
+use serde::Serialize;
+use sysinfo::System;
+
+/// Bytes in the gigabyte memory is counted in: a "32 GB" computer has 32 × 2³⁰ bytes, not 32 × 10⁹.
+const GIB: f64 = (1u64 << 30) as f64;
+
+/// The set a clean install selects when no card fits any set: the lightest,
+/// so the model manager still names a concrete local target.
+const FALLBACK_PROFILE: &str = "light";
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Hardware {
+    pub gpu_name: Option<String>,
+    pub total_vram_gb: f64,
+    pub total_ram_gb: f64,
+    /// An NVIDIA card: the engine runs on CUDA there, which needs cuBLAS.
+    /// Every other card runs on Vulkan and needs nothing downloaded.
+    pub nvidia: bool,
+    /// The CUDA build of the engine this card and its driver run, none when
+    /// neither does: such a card computes on Vulkan.
+    pub cuda: Option<CudaBuild>,
+    /// Whether the card and its driver run CUDA at all - what the ONNX Runtime's
+    /// CUDA build needs - whichever build of the engine this platform ships.
+    pub runs_cuda: bool,
+    /// The CUDA build the card and its driver run, on every platform: what a trainer or a recogniser built for this
+    /// machine needs, whatever the engine computes on.
+    pub card_cuda: Option<CudaBuild>,
+    /// The NVIDIA card's compute capability, `[7, 5]` for Turing.
+    pub compute_capability: Option<(u32, u32)>,
+    /// The major version of the NVIDIA driver, 581 for 581.29.
+    pub driver_major: Option<u32>,
+    /// The model set id that fits this card, none when no set does.
+    pub recommended: Option<&'static str>,
+    /// The engine computes on the card through Vulkan: a card with no CUDA build of the engine for it (every card on
+    /// Linux, an AMD or Intel one on Windows), not Apple's Metal.
+    pub vulkan: bool,
+    /// No card the songs are computed on: none at all, or one with less memory than the smallest local set needs.
+    pub on_processor: bool,
+}
+
+/// The engine ships one CUDA backend per toolkit. CUDA 13 targets Turing and
+/// newer and needs a driver from its own release on; CUDA 12 carries the
+/// Maxwell, Pascal and Volta cards CUDA 13 dropped, and every newer card whose
+/// driver predates CUDA 13. Both hold device code for each architecture, so no
+/// driver ever compiles PTX.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CudaBuild {
+    Cuda12,
+    Cuda13,
+}
+
+impl CudaBuild {
+    /// The folder beside yue-server.exe that holds this build's ggml-cuda.dll.
+    pub fn folder(self) -> &'static str {
+        match self {
+            CudaBuild::Cuda12 => "cuda12",
+            CudaBuild::Cuda13 => "cuda13",
+        }
+    }
+}
+
+/// The first driver of each CUDA major line on Windows, from NVIDIA's CUDA
+/// compatibility tables: minor version compatibility runs a whole major line
+/// on it, and device code needs nothing newer.
+pub const CUDA13_DRIVER: u32 = 580;
+const CUDA12_DRIVER: u32 = 525;
+
+/// The oldest architecture the CUDA 12 build has device code for: 5.2, the
+/// Maxwell of the GTX 900 series and the Tesla M40.
+const CUDA12_OLDEST: (u32, u32) = (5, 2);
+/// Turing, the oldest architecture CUDA 13 still targets.
+const CUDA13_OLDEST: (u32, u32) = (7, 5);
+
+/// Picks the build from the card's compute capability and the driver's major
+/// version, the way Ollama chooses between its CUDA runners.
+pub fn cuda_build(compute: (u32, u32), driver_major: u32) -> Option<CudaBuild> {
+    if compute >= CUDA13_OLDEST && driver_major >= CUDA13_DRIVER {
+        Some(CudaBuild::Cuda13)
+    } else if compute >= CUDA12_OLDEST && driver_major >= CUDA12_DRIVER {
+        Some(CudaBuild::Cuda12)
+    } else {
+        None
+    }
+}
+
+/// Why neither CUDA build runs on this NVIDIA card, in the words of the
+/// thresholds `cuda_build` applies.
+pub fn cuda_unavailable_reason(hardware: &Hardware) -> String {
+    match (hardware.compute_capability, hardware.driver_major) {
+        (Some(compute), _) if compute < CUDA12_OLDEST => format!("compute capability {}.{} is older than the 5.2 the CUDA 12 build starts at", compute.0, compute.1),
+        (Some(_), Some(driver)) if driver < CUDA12_DRIVER => format!("driver {driver} is older than the {CUDA12_DRIVER} CUDA 12 needs"),
+        _ => "nvidia-smi did not report the card's compute capability and driver".into(),
+    }
+}
+
+/// The NVIDIA card a CUDA failure happened on, in the words a report needs to
+/// tell a missing architecture from an old driver:
+/// `NVIDIA GeForce GTX 1050, compute 6.1, driver 581, cuda12 build`.
+pub fn describe_card(hardware: &Hardware) -> Option<String> {
+    if !hardware.nvidia {
+        return None;
+    }
+    let name = hardware.gpu_name.as_deref()?;
+    let compute = hardware.compute_capability.map_or("unknown".to_string(), |(major, minor)| format!("{major}.{minor}"));
+    let driver = hardware.driver_major.map_or("unknown".to_string(), |major| major.to_string());
+    let build = hardware.cuda.map_or("no CUDA", CudaBuild::folder);
+    Some(format!("{name}, compute {compute}, driver {driver}, {build} build"))
+}
+
+/// Tensor cores before Ampere accumulate in FP16, where the V projection can
+/// overflow to infinity and poison every later attention; the engine's clamp
+/// keeps it in range and changes nothing on a card that never overflows.
+pub fn accumulates_in_fp16() -> bool {
+    probe().compute_capability.is_some_and(|compute| compute < (8, 0))
+}
+
+/// The CUDA build of the engine a card and driver that run `card` compute on: either build on Windows and Linux, the
+/// same table on both; none on a Mac, which has Metal.
+fn engine_cuda(card: Option<CudaBuild>) -> Option<CudaBuild> {
+    if cfg!(target_os = "macos") { None } else { card }
+}
+
+/// `nvidia-smi` costs tens of milliseconds and the setup screen polls status
+/// once per second while a download runs. The machine's GPU does not change
+/// inside one process lifetime, so probe it once.
+fn probe() -> &'static Hardware {
+    static HARDWARE: OnceLock<Hardware> = OnceLock::new();
+    HARDWARE.get_or_init(|| {
+        let mut system = System::new().expect("sysinfo has Windows, Linux and macOS");
+        system.refresh_memory();
+        let total_ram_gb = system.total_memory() as f64 / GIB;
+        let (gpu_name, total_vram_gb, nvidia) = match nvidia_smi() {
+            Some((name, vram)) => (Some(name), vram, true),
+            None => match display_adapter() {
+                Some((name, vram)) => (Some(name), vram, false),
+                None => (None, 0.0, false),
+            },
+        };
+        let device = if nvidia { nvidia_cuda_device() } else { None };
+        let runs_cuda = device.and_then(|(compute, driver)| cuda_build(compute, driver)).is_some();
+        let cuda = engine_cuda(device.and_then(|(compute, driver)| cuda_build(compute, driver)));
+        let card_cuda = device.and_then(|(compute, driver)| cuda_build(compute, driver));
+        let compute_capability = device.map(|(compute, _)| compute);
+        let driver_major = device.map(|(_, driver)| driver);
+        let vulkan = gpu_name.is_some() && cuda.is_none() && !cfg!(target_os = "macos");
+        Hardware {
+            vulkan,
+            on_processor: computes_on_processor(nvidia, total_vram_gb),
+            gpu_name,
+            total_vram_gb,
+            total_ram_gb,
+            nvidia,
+            cuda,
+            runs_cuda,
+            card_cuda,
+            compute_capability,
+            driver_major,
+            recommended: profile_for_machine(total_vram_gb, total_ram_gb, crate::model_manager::profile_weights_bytes),
+        }
+    })
+}
+
+pub fn hardware() -> Hardware {
+    probe().clone()
+}
+
+/// Whether songs are computed on the processor: no card, or built-in graphics below the smallest local set. An
+/// NVIDIA card nvidia-smi lists is where the engine computes on CUDA at any size; a Mac computes on Metal.
+fn computes_on_processor(nvidia: bool, total_vram_gb: f64) -> bool {
+    let smallest = VRAM_TIERS.iter().map(|(_, tier)| *tier).fold(f64::INFINITY, f64::min);
+    !cfg!(target_os = "macos") && !nvidia && total_vram_gb < smallest
+}
+
+/// VRAM tiers follow the strict-eviction peak of each set: the larger backbone
+/// half plus the KV cache and the compute buffers. The cache is sized to the
+/// song, about 1.5 GB for 130 s under guidance, so the tiers keep headroom for
+/// the longest songs.
+const VRAM_TIERS: [(&str, f64); 4] = [("native", 12.0), ("quality-q8", 8.0), ("balanced", 7.0), ("light", 5.5)];
+
+/// The unquantised set stays in the list for whoever picks it; the studio never recommends full weights,
+/// Q8_0 is near lossless at half the memory.
+const FULL_WEIGHTS_PROFILE: &str = "native";
+
+/// What the system, the window and the service hold beside the models.
+const SYSTEM_RAM_GB: f64 = 4.0;
+/// A set read from disk passes through memory even when its weights end on the card.
+const LOADING_RAM_GB: f64 = 2.0;
+/// The KV cache and compute buffers of the longest songs, when they live in RAM.
+const WORK_RAM_GB: f64 = 2.0;
+
+/// Memory a set needs on this machine. On a card the set's tier fits, the
+/// weights live in video memory; on integrated graphics, which share the
+/// computer's memory, or on the processor they live in RAM with the buffers.
+pub fn ram_needed_gb(profile: &str, weights_bytes: u64, total_vram_gb: f64) -> f64 {
+    // Apple Silicon's video memory is the system's own, so weights "on the card" still take the RAM
+    let on_card = !cfg!(target_os = "macos") && VRAM_TIERS.iter().any(|(id, tier)| *id == profile && total_vram_gb >= *tier);
+    if on_card {
+        SYSTEM_RAM_GB + LOADING_RAM_GB
+    } else {
+        weights_bytes as f64 / GIB + WORK_RAM_GB + SYSTEM_RAM_GB
+    }
+}
+
+/// The largest set the card and the memory both hold; without a card for any
+/// set, the lightest one when the memory holds it in RAM.
+fn profile_for_machine(total_vram_gb: f64, total_ram_gb: f64, weights_bytes: impl Fn(&str) -> u64) -> Option<&'static str> {
+    let fits = |id: &str| total_ram_gb >= ram_needed_gb(id, weights_bytes(id), total_vram_gb);
+    VRAM_TIERS
+        .iter()
+        .filter(|(id, _)| *id != FULL_WEIGHTS_PROFILE)
+        .find(|(id, tier)| total_vram_gb >= *tier && fits(id))
+        .map(|(id, _)| *id)
+        .or_else(|| Some(FALLBACK_PROFILE).filter(|id| fits(id)))
+}
+
+/// Chooses the complete local set on a clean install. This only records a
+/// selection; downloading any component remains a separate user action.
+pub fn recommended_local_profile() -> &'static str {
+    probe().recommended.unwrap_or(FALLBACK_PROFILE)
+}
+
+fn quiet(program: &str) -> Command {
+    let mut command = dub_core::proc::host_command(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // A GUI process spawning a console tool flashes a window without this.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
+/// The card the studio was pointed at (`apply_saved_gpu`), as nvidia-smi's
+/// `-i` takes it: the same PCI order CUDA_DEVICE_ORDER=PCI_BUS_ID gives CUDA.
+pub(crate) fn chosen_card() -> Vec<String> {
+    match std::env::var("CUDA_VISIBLE_DEVICES").ok().and_then(|value| value.trim().parse::<u32>().ok()) {
+        Some(index) => vec!["-i".into(), index.to_string()],
+        None => Vec::new(),
+    }
+}
+
+/// Every NVIDIA card; `None` when nvidia-smi did not answer (not on PATH, did not start, failed), which says nothing
+/// about the cards. The answer is kept for half a minute: the setup status, polled every second, and the engine's
+/// watchdog ask for the cards while one is chosen.
+pub fn nvidia_cards() -> Option<Cards> {
+    static LAST: std::sync::Mutex<Option<(std::time::Instant, Option<Cards>)>> = std::sync::Mutex::new(None);
+    remembered(&LAST, CARDS_FRESH, ask_nvidia_smi_for_cards)
+}
+
+/// NVIDIA cards: nvidia-smi index, name and memory in GB.
+pub type Cards = Vec<(u32, String, f64)>;
+
+const CARDS_FRESH: std::time::Duration = std::time::Duration::from_secs(30);
+
+fn remembered<T: Clone>(slot: &std::sync::Mutex<Option<(std::time::Instant, T)>>, fresh: std::time::Duration, ask: impl FnOnce() -> T) -> T {
+    let mut last = slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((_, answer)) = last.as_ref().filter(|(at, _)| at.elapsed() < fresh) {
+        return answer.clone();
+    }
+    let answer = ask();
+    *last = Some((std::time::Instant::now(), answer.clone()));
+    answer
+}
+
+fn ask_nvidia_smi_for_cards() -> Option<Cards> {
+    let output = quiet("nvidia-smi").args(["--query-gpu=index,name,memory.total", "--format=csv,noheader,nounits"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(parse_cards(&String::from_utf8_lossy(&output.stdout)))
+}
+
+fn parse_cards(csv: &str) -> Cards {
+    csv.lines()
+        .filter_map(|line| {
+            let mut fields = line.split(',').map(str::trim);
+            let index = fields.next()?.parse().ok()?;
+            let name = fields.next()?.to_string();
+            let memory = fields.next()?.parse::<f64>().ok()? / 1024.0;
+            Some((index, name, memory))
+        })
+        .collect()
+}
+
+fn nvidia_smi() -> Option<(String, f64)> {
+    let output = quiet("nvidia-smi").args(chosen_card()).args(["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let line = String::from_utf8_lossy(&output.stdout).lines().next()?.trim().to_owned();
+    let (name, memory) = line.rsplit_once(',')?;
+    Some((name.trim().into(), memory.trim().parse::<f64>().ok()? / 1024.0))
+}
+
+/// Asked apart from the name and memory: a driver too old to know
+/// `compute_cap` fails the whole query, and such a driver runs neither build.
+fn nvidia_cuda_device() -> Option<((u32, u32), u32)> {
+    let output = quiet("nvidia-smi").args(chosen_card()).args(["--query-gpu=compute_cap,driver_version", "--format=csv,noheader"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let line = String::from_utf8_lossy(&output.stdout).lines().next()?.trim().to_owned();
+    parse_cuda_query(&line)
+}
+
+/// `7.5, 581.29` into the compute capability and the driver's major version.
+fn parse_cuda_query(line: &str) -> Option<((u32, u32), u32)> {
+    let (compute, driver) = line.split_once(',')?;
+    let (major, minor) = compute.trim().split_once('.')?;
+    let driver_major = driver.trim().split('.').next()?.parse().ok()?;
+    Some(((major.parse().ok()?, minor.parse().ok()?), driver_major))
+}
+
+/// The display adapter with the most dedicated memory, from the driver's own
+/// registry entry: `HardwareInformation.qwMemorySize` is the 64-bit size the
+/// driver reports, where WMI's `AdapterRAM` wraps at 4 GB.
+#[cfg(windows)]
+fn display_adapter() -> Option<(String, f64)> {
+    const CLASS: &str = r"HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
+    let query = |value: &str| -> Option<String> {
+        let output = quiet("reg").args(["query", CLASS, "/s", "/v", value]).output().ok()?;
+        output.status.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+    };
+    best_adapter(&query("DriverDesc")?, &query("HardwareInformation.qwMemorySize")?)
+}
+
+#[cfg(target_os = "macos")]
+fn display_adapter() -> Option<(String, f64)> {
+    // Apple Silicon has one GPU per machine and no separate VRAM: its memory
+    // is the system's (unified), so the whole RAM is what a model set has to
+    // share with the rest of the machine. The chip name is the only identity
+    // macOS reports for it.
+    let output = quiet("system_profiler").args(["-json", "SPDisplaysDataType"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout).into_owned();
+    let chip = apple_chip(&text)?;
+    let ram = quiet("sysctl").args(["-n", "hw.memsize"]).output().ok().and_then(|output| {
+        std::str::from_utf8(&output.stdout).ok().and_then(|value| value.trim().parse::<u64>().ok())
+    })?;
+    Some((chip, ram as f64 / GIB))
+}
+
+/// The chip name from `system_profiler -json SPDisplaysDataType`: the value of
+/// `"sppci_model" : "Apple M2 Max"`.
+#[cfg(any(target_os = "macos", test))]
+fn apple_chip(profile: &str) -> Option<String> {
+    let after_key = profile.split("\"sppci_model\"").nth(1)?;
+    let name = after_key.split('"').nth(1)?;
+    name.starts_with("Apple ").then(|| name.to_string())
+}
+
+/// Linux has no registry to read the adapter from, so the card is named from
+/// its PCI identity instead. The name matters beyond the setup screen: an
+/// unnamed card leaves `gpu_name` empty, and `device_chain` only tries Vulkan
+/// when a card was found, so the engine would fall straight to the processor
+/// on a machine whose GPU works. Used by the Intel and AMD builds alike.
+#[cfg(not(any(windows, target_os = "macos")))]
+fn display_adapter() -> Option<(String, f64)> {
+    let card = linux_card()?;
+    let name = linux_card_name(&card.vendor_id, &card.device_id);
+    Some((name, card.vram_gb))
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+struct LinuxCard {
+    vendor_id: String,
+    device_id: String,
+    vram_gb: f64,
+}
+
+/// The first DRM card that is a PCI device, with the dedicated memory it
+/// reports. Only the proprietary AMD driver publishes `mem_info_vram_total`;
+/// where it is absent the size stays 0.0, which recommends the lightest set
+/// rather than guessing at one that may not fit.
+#[cfg(not(any(windows, target_os = "macos")))]
+fn linux_card() -> Option<LinuxCard> {
+    let mut cards: Vec<PathBuf> = std::fs::read_dir("/sys/class/drm")
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("card") && name[4..].chars().all(|c| c.is_ascii_digit()))
+        })
+        .collect();
+    cards.sort();
+    cards.into_iter().find_map(|path| {
+        let device = path.join("device");
+        let read = |name: &str| -> Option<String> {
+            std::fs::read_to_string(device.join(name)).ok().map(|value| value.trim().to_owned())
+        };
+        let vendor_id = read("vendor")?;
+        let device_id = read("device").unwrap_or_default();
+        let vram_gb = read("mem_info_vram_total")
+            .and_then(|bytes| bytes.parse::<f64>().ok())
+            .map_or(0.0, |bytes| bytes / 1024.0 / 1024.0 / 1024.0);
+        Some(LinuxCard { vendor_id, device_id, vram_gb })
+    })
+}
+
+/// `lspci` names the card as a person would; without it the vendor still names
+/// it well enough to reach the GPU. `8086` is Intel, `1002` and `1022` AMD.
+#[cfg(not(any(windows, target_os = "macos")))]
+fn linux_card_name(vendor_id: &str, device_id: &str) -> String {
+    let vendor = match vendor_id.trim_start_matches("0x").to_ascii_lowercase().as_str() {
+        "8086" => "Intel",
+        "1002" | "1022" => "AMD",
+        "10de" => "NVIDIA",
+        _ => "PCI",
+    };
+    lspci_name(device_id).unwrap_or_else(|| format!("{vendor} display adapter ({vendor_id}:{device_id})"))
+}
+
+/// The `lspci` line for this PCI device, trimmed to the adapter's own name:
+/// `04:00.0 VGA compatible controller: Intel Corporation Battlemage G21
+/// [Arc B580] [8086:e20b]` keeps `Battlemage G21 [Arc B580]`.
+#[cfg(not(any(windows, target_os = "macos")))]
+fn lspci_name(device_id: &str) -> Option<String> {
+    let output = quiet("lspci").args(["-nn"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_lspci_name(&String::from_utf8_lossy(&output.stdout), device_id)
+}
+
+/// Pulls the adapter's own name out of an `lspci -nn` listing. The line is
+/// found by the bracketed device id, which `lspci` writes as `[vendor:device]`
+/// in lowercase, so the `:` keeps a class code like `[0300]` from matching.
+/// The model name wraps the vendor, and the class prefix sits before the
+/// first `: `, so both are dropped.
+#[cfg(not(any(windows, target_os = "macos")))]
+fn parse_lspci_name(listing: &str, device_id: &str) -> Option<String> {
+    let id = device_id.trim_start_matches("0x").to_ascii_lowercase();
+    if id.is_empty() {
+        return None;
+    }
+    let needle = format!(":{id}]");
+    let line = listing.lines().find(|line| line.to_ascii_lowercase().contains(&needle))?;
+    let after_class = line.split_once(": ")?.1;
+    let name = after_class.split_once(" [").map_or(after_class, |(name, _)| name).trim();
+    (!name.is_empty()).then(|| name.to_owned())
+}
+
+/// Joins `reg query /s` listings of the adapter names and memory sizes by
+/// their subkey and keeps the adapter with the most memory.
+#[cfg(windows)]
+fn best_adapter(names: &str, sizes: &str) -> Option<(String, f64)> {
+    fn values(listing: &str) -> Vec<(String, String)> {
+        let mut key = String::new();
+        let mut out = Vec::new();
+        for line in listing.lines() {
+            if line.starts_with("HKEY_") {
+                key = line.trim().to_owned();
+            } else if let Some((_, value)) = line.trim().split_once("    REG_") {
+                if let Some((_, data)) = value.split_once("    ") {
+                    out.push((key.clone(), data.trim().to_owned()));
+                }
+            }
+        }
+        out
+    }
+    let names = values(names);
+    values(sizes)
+        .into_iter()
+        .filter_map(|(key, size)| {
+            let bytes = u64::from_str_radix(size.trim_start_matches("0x"), 16).ok()?;
+            let name = names.iter().find(|(name_key, _)| *name_key == key)?.1.clone();
+            (!name.starts_with("Microsoft")).then_some((name, bytes as f64 / 1024.0 / 1024.0 / 1024.0))
+        })
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+}
+
+#[cfg(test)]
+mod tests {
+    /// Songs are computed on the processor without a card and on built-in graphics below the smallest set; an NVIDIA
+    /// card of any size computes on CUDA. The window says so then.
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn songs_go_to_the_processor_without_a_card_or_on_built_in_graphics() {
+        assert!(super::computes_on_processor(false, 0.0), "no card");
+        assert!(super::computes_on_processor(false, 0.125), "Intel UHD with 128 MB");
+        assert!(!super::computes_on_processor(true, 3.0), "an NVIDIA card of 3 GB computes on CUDA");
+        assert!(!super::computes_on_processor(false, 16.0), "an AMD card of 16 GB");
+    }
+
+    #[test]
+    fn the_engine_computes_on_the_cuda_build_this_platform_ships() {
+        use super::{engine_cuda, CudaBuild};
+        assert_eq!(engine_cuda(None), None, "no NVIDIA card, or a driver that runs neither build: Vulkan");
+        if cfg!(target_os = "macos") {
+            assert_eq!(engine_cuda(Some(CudaBuild::Cuda13)), None, "a Mac computes on Metal");
+        } else {
+            assert_eq!(engine_cuda(Some(CudaBuild::Cuda13)), Some(CudaBuild::Cuda13), "Turing and newer, driver 580 or newer");
+            assert_eq!(engine_cuda(Some(CudaBuild::Cuda12)), Some(CudaBuild::Cuda12), "Maxwell to Volta and GTX 16, driver 525 or newer");
+        }
+    }
+
+    #[test]
+    fn the_apple_chip_is_read_from_the_system_profiler_json() {
+        let profile = r#"{ "SPDisplaysDataType" : [ { "_name" : "Apple M2 Max", "sppci_cores" : "30", "sppci_model" : "Apple M2 Max" } ] }"#;
+        assert_eq!(super::apple_chip(profile).as_deref(), Some("Apple M2 Max"));
+        assert_eq!(super::apple_chip(r#"{ "sppci_model" : "AMD Radeon Pro" }"#), None);
+        assert_eq!(super::apple_chip("{}"), None);
+    }
+
+    use super::*;
+
+    fn weights(id: &str) -> u64 {
+        crate::model_manager::profile_weights_bytes(id)
+    }
+
+    #[test]
+    fn with_enough_memory_the_card_picks_the_set() {
+        assert_eq!(profile_for_machine(24.0, 64.0, weights), Some("quality-q8"));
+        assert_eq!(profile_for_machine(11.9, 32.0, weights), Some("quality-q8"));
+        assert_eq!(profile_for_machine(8.0, 16.0, weights), Some("quality-q8"));
+        assert_eq!(profile_for_machine(7.6, 16.0, weights), Some("balanced"));
+        assert_eq!(profile_for_machine(6.0, 16.0, weights), Some("light"));
+    }
+
+    #[test]
+    fn without_a_card_for_any_set_the_light_one_runs_from_memory_that_holds_it() {
+        assert_eq!(profile_for_machine(4.0, 16.0, weights), Some("light"));
+        assert_eq!(profile_for_machine(0.0, 16.0, weights), Some("light"));
+        assert_eq!(profile_for_machine(0.0, 8.0, weights), None);
+        assert_eq!(profile_for_machine(2.0, 8.0, weights), None);
+    }
+
+    #[test]
+    fn a_set_the_card_holds_needs_the_system_and_loading_memory_only() {
+        assert_eq!(ram_needed_gb("quality-q8", weights("quality-q8"), 12.0), 6.0);
+        let light_in_memory = ram_needed_gb("light", weights("light"), 0.0);
+        assert!((8.5..9.0).contains(&light_in_memory), "{light_in_memory}");
+        assert!(profile_for_machine(8.0, 5.0, weights).is_none());
+    }
+
+    #[test]
+    fn every_recommendation_is_a_declared_profile() {
+        for vram in [6.0, 7.5, 10.0, 16.0, 24.0] {
+            assert!(crate::model_manager::profile_exists(profile_for_machine(vram, 64.0, weights).unwrap()));
+        }
+        assert!(crate::model_manager::profile_exists(FALLBACK_PROFILE));
+    }
+
+    #[test]
+    fn the_cuda_build_follows_the_architecture_and_the_driver() {
+        // GTX 1660 Super on a current driver: device code from CUDA 13.
+        assert_eq!(cuda_build((7, 5), 581), Some(CudaBuild::Cuda13));
+        assert_eq!(cuda_build((12, 0), 590), Some(CudaBuild::Cuda13));
+        // Pascal and Maxwell, which CUDA 13 dropped, on any driver.
+        assert_eq!(cuda_build((6, 1), 581), Some(CudaBuild::Cuda12));
+        assert_eq!(cuda_build((5, 2), 560), Some(CudaBuild::Cuda12));
+        assert_eq!(cuda_build((7, 0), 552), Some(CudaBuild::Cuda12));
+        // A new card on a driver from before CUDA 13.
+        assert_eq!(cuda_build((8, 9), 566), Some(CudaBuild::Cuda12));
+        // Kepler, the first Maxwell and drivers older than CUDA 12: Vulkan.
+        assert_eq!(cuda_build((3, 5), 581), None);
+        assert_eq!(cuda_build((5, 0), 581), None);
+        assert_eq!(cuda_build((8, 6), 511), None);
+    }
+
+    #[test]
+    fn the_cuda_query_reads_the_capability_and_the_driver_major() {
+        assert_eq!(parse_cuda_query("7.5, 581.29"), Some(((7, 5), 581)));
+        assert_eq!(parse_cuda_query("12.0, 591.44"), Some(((12, 0), 591)));
+        assert_eq!(parse_cuda_query("[N/A], 581.29"), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_adapter_with_the_most_memory_wins_and_basic_display_never_does() {
+        let names = "\r\nHKEY_LOCAL_MACHINE\\X\\0000\r\n    DriverDesc    REG_SZ    AMD Radeon RX 7800 XT\r\n\r\nHKEY_LOCAL_MACHINE\\X\\0001\r\n    DriverDesc    REG_SZ    Intel(R) UHD Graphics 770\r\n\r\nHKEY_LOCAL_MACHINE\\X\\0002\r\n    DriverDesc    REG_SZ    Microsoft Basic Display Adapter\r\n";
+        let sizes = "\r\nHKEY_LOCAL_MACHINE\\X\\0000\r\n    HardwareInformation.qwMemorySize    REG_QWORD    0x400000000\r\n\r\nHKEY_LOCAL_MACHINE\\X\\0001\r\n    HardwareInformation.qwMemorySize    REG_QWORD    0x80000000\r\n\r\nHKEY_LOCAL_MACHINE\\X\\0002\r\n    HardwareInformation.qwMemorySize    REG_QWORD    0x800000000\r\n";
+        let (name, vram) = best_adapter(names, sizes).unwrap();
+        assert_eq!(name, "AMD Radeon RX 7800 XT");
+        assert_eq!(vram, 16.0);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_linux_card_is_named_from_its_vendor_when_lspci_is_silent() {
+        // No device id resolves through lspci, so the vendor carries the name.
+        let name = linux_card_name("0x8086", "0xffff");
+        assert!(name.starts_with("Intel"), "got {name}");
+        assert!(name.contains("0x8086"), "the ids stay visible: {name}");
+        assert_eq!(linux_card_name("0x1002", "0xffff").split(' ').next(), Some("AMD"));
+        assert_eq!(linux_card_name("0x10de", "0xffff").split(' ').next(), Some("NVIDIA"));
+        assert_eq!(linux_card_name("0x1234", "0xffff").split(' ').next(), Some("PCI"));
+        // The `0x` prefix is optional, as sysfs and lspci disagree on it.
+        assert_eq!(linux_card_name("8086", "ffff").split(' ').next(), Some("Intel"));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn an_lspci_line_keeps_the_adapter_name_and_drops_the_class_and_ids() {
+        // The real shape of `lspci -nn` on this machine, with a decoy line
+        // whose class text also holds a colon and brackets, and whose ids
+        // share the vendor `8086`.
+        let listing = concat!(
+            "00:1f.3 Audio device [0403]: Intel Corporation Device [8086:7f50]\n",
+            "04:00.0 VGA compatible controller [0300]: Intel Corporation Battlemage G21 [Arc B580] [8086:e20b]\n",
+        );
+        assert_eq!(
+            parse_lspci_name(listing, "0xe20b").as_deref(),
+            Some("Intel Corporation Battlemage G21")
+        );
+        // The sibling Intel device resolves to its own line, not the GPU's.
+        assert_eq!(parse_lspci_name(listing, "0x7f50").as_deref(), Some("Intel Corporation Device"));
+        // The class code `0300` must not be mistaken for a device id.
+        assert_eq!(parse_lspci_name(listing, "0x0300"), None);
+        // A device id nobody carries names nothing, and an empty one is safe.
+        assert_eq!(parse_lspci_name(listing, "0x1234"), None);
+        assert_eq!(parse_lspci_name(listing, "0x"), None);
+    }
+
+    #[test]
+    fn the_card_list_reads_nvidia_smi_lines() {
+        let cards = parse_cards("0, NVIDIA GeForce RTX 4090, 24564\n1, NVIDIA GeForce RTX 3060, 12288\n");
+        assert_eq!(cards, vec![(0, "NVIDIA GeForce RTX 4090".to_string(), 24564.0 / 1024.0), (1, "NVIDIA GeForce RTX 3060".to_string(), 12.0)]);
+    }
+
+    #[test]
+    fn a_second_ask_within_its_life_does_not_run_nvidia_smi_again() {
+        let slot = std::sync::Mutex::new(None);
+        let asked = std::cell::Cell::new(0);
+        let ask = || {
+            asked.set(asked.get() + 1);
+            None::<Cards>
+        };
+        assert_eq!(remembered(&slot, std::time::Duration::from_secs(30), ask), None);
+        assert_eq!(remembered(&slot, std::time::Duration::from_secs(30), ask), None);
+        assert_eq!(asked.get(), 1, "a failed answer is kept too");
+        remembered(&slot, std::time::Duration::ZERO, ask);
+        assert_eq!(asked.get(), 2, "an answer past its life is asked again");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn this_machine_reports_a_card_that_can_reach_vulkan() {
+        // The engine only tries Vulkan when a card was found, so an unnamed
+        // adapter is the difference between the GPU and the processor.
+        if let Some((name, _)) = display_adapter() {
+            assert!(!name.trim().is_empty(), "a found card is always named");
+        }
+    }
+}

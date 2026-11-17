@@ -1,0 +1,1299 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Song } from '../types';
+import { Play, MoreHorizontal, Heart, ListPlus, Pause, Search, Filter, Check, Loader2, Share2, Video, Info, Clock, Timer, ImagePlus, Pencil, Clapperboard, ListMusic, Trash2, Piano, Download, ListStart, ListEnd, Rows3, Rows4, Sparkles, FileAudio, GitBranch, Mic2, Layers } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../context/I18nContext';
+import type { TranslationKey } from '../i18n/translations';
+import { SongDropdownMenu } from './SongDropdownMenu';
+import { SongCover } from './AlbumCover';
+import { updateNativeSong } from '../services/nativeLibrary';
+import { ownsSong, SongActionsProvider, useSongActions } from '../context/SongActionsContext';
+import { captionSummary } from '../services/examples';
+import { named } from '../services/accessibleName';
+import { foldStems, stemOf } from '../services/songStems';
+import { StemIcon, StemsToggle, useStemName } from './StemsToggle';
+import { SortMenu } from './SortMenu';
+import { exactMoment, relativeMoment } from '../services/dates';
+import { compareBy, SONG_ORDERS, useListOrder, type SongOrder } from '../services/songOrder';
+import { onPlayHistory } from '../services/playHistory';
+import { downloadSongAudio } from '../services/songDownload';
+import { nameMatches, searchWords, songMatches } from '../services/songSearch';
+
+interface SongListProps {
+    songs: Song[];
+    currentSong: Song | null;
+    selectedSong: Song | null;
+    likedSongIds: Set<string>;
+    isPlaying: boolean;
+    referenceTracks?: { id: string; filename: string; audio_url: string; duration?: number | null; created_at?: string }[];
+    /** Plays a track; the queue is the list's songs in their order, or the stem alone. */
+    onPlay: (song: Song, queue?: Song[]) => void;
+    onSelect: (song: Song) => void;
+    /** The whole library, where a song's stems are found when the list holds the song alone. */
+    librarySongs?: Song[];
+    /** The playlist the list shows, when it is not the whole library. */
+    scopeName?: string;
+    /** The library is still being read: an empty list is not an answer yet. */
+    loading?: boolean;
+    onToggleLike: (songId: string) => void;
+    onAddToPlaylist: (song: Song) => void;
+    onOpenCoverRegen?: (song: Song) => void;
+    onShowDetails?: (song: Song) => void;
+    onNavigateToProfile?: (username: string) => void;
+    onSongUpdate?: (updatedSong: Song) => void;
+    onDeleteMany?: (songs: Song[]) => void;
+    /** Adds every chosen song to one playlist. */
+    onAddManyToPlaylist?: (songs: Song[]) => void;
+    /** Turns every chosen song into MIDI, one after another. */
+    onMidiMany?: (songs: Song[]) => void;
+    /** Inside another page, which scrolls and names the list itself. */
+    embedded?: boolean;
+    /** The song whose details are open, so its button shows it. */
+    detailsSongId?: string | null;
+    /** Where the chosen order is remembered, and which orders the list offers. */
+    orderKey?: string;
+    orders?: SongOrder[];
+    defaultOrder?: SongOrder;
+    onCancelJob?: (jobId: string) => void;
+    onResetJob?: (jobId: string) => void;
+    /** Makes a failed song again: its LoRA at 1.0 on Composition when its score could not be written, as it was when
+     *  the card computed something other than sound. */
+    onScoreAgain?: (jobId: string, how: 'score-strength' | 'again') => void;
+    onCancelAll?: () => void;
+    onResetAll?: () => void;
+    activeJobCount?: number;
+    /** What an empty list says when nothing is searched or filtered. */
+    emptyMessage?: string;
+}
+
+// ... existing code ...
+
+
+
+// Define Filter Types
+type FilterType = 'liked' | 'made' | 'imported' | 'derived' | 'karaoke' | 'versions' | 'generating';
+/** Where a song came from: these filters add up, the others narrow. */
+const SOURCE_FILTERS: FilterType[] = ['made', 'imported', 'derived'];
+const isImported = (song: Song) => song.ditModel === 'imported-audio';
+
+/** Rows with their cover, style and actions, or one line each. */
+type Density = 'comfortable' | 'compact';
+const DENSITY_KEY = 'studio.library.density';
+function readDensity(): Density {
+    try {
+        return window.localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable';
+    } catch {
+        return 'comfortable';
+    }
+}
+
+/// The badge names the complete component set the track was rendered with —
+/// that is what actually determines its fidelity.
+const PROFILE_BADGE: Record<string, string> = {
+    native: 'Full',
+    'quality-q8': 'Q8',
+    balanced: 'Bal',
+    light: 'Light',
+};
+
+const getProfileBadge = (song: Song): string => {
+    if (song.ditModel === 'openrouter') return 'Cloud';
+    if (song.ditModel === 'imported-audio') return 'Import';
+    return song.lmModel ? PROFILE_BADGE[song.lmModel] ?? song.lmModel : 'YuE2';
+};
+
+const createDragPreview = (element: HTMLElement) => {
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.style.width = `${element.offsetWidth}px`;
+    clone.style.position = 'fixed';
+    clone.style.top = '-1000px';
+    clone.style.left = '-1000px';
+    clone.style.pointerEvents = 'none';
+    clone.style.opacity = '0.95';
+
+    const badge = document.createElement('div');
+    badge.textContent = '+';
+    badge.style.position = 'absolute';
+    badge.style.left = '8px';
+    badge.style.bottom = '8px';
+    badge.style.width = '24px';
+    badge.style.height = '24px';
+    badge.style.display = 'flex';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    badge.style.borderRadius = '9999px';
+    badge.style.background = '#22c55e';
+    badge.style.color = 'white';
+    badge.style.boxShadow = '0 6px 16px rgba(0,0,0,0.25)';
+    badge.style.fontSize = '16px';
+    badge.style.lineHeight = '1';
+    clone.style.position = 'relative';
+    clone.appendChild(badge);
+
+    document.body.appendChild(clone);
+    return clone;
+};
+
+/** A generation's card rather than a song: being made, or stopped and waiting to be cleared. */
+const isCard = (song: Song) => Boolean(song.isGenerating) || song.stage === 'cancelled' || song.stage === 'failed';
+
+export const SongList: React.FC<SongListProps> = ({
+    songs,
+    currentSong,
+    selectedSong,
+    likedSongIds,
+    isPlaying,
+    referenceTracks = [],
+    onPlay,
+    onSelect,
+    librarySongs,
+    scopeName,
+    loading = false,
+    onToggleLike,
+    onAddToPlaylist,
+    onOpenCoverRegen,
+    onShowDetails,
+    onNavigateToProfile,
+    onSongUpdate,
+    onDeleteMany,
+    onAddManyToPlaylist,
+    onMidiMany,
+    embedded = false,
+    detailsSongId = null,
+    orderKey = 'create',
+    orders = SONG_ORDERS,
+    defaultOrder = 'newest',
+    onCancelJob,
+    onCancelAll,
+    onResetJob,
+    onScoreAgain,
+    onResetAll,
+    activeJobCount = 0,
+    emptyMessage,
+}) => {
+    const { user } = useAuth();
+    const { t, songCount, language } = useI18n();
+    const songActions = useSongActions();
+    const [density, setDensity] = useState<Density>(readDensity);
+    const chooseDensity = (next: Density) => {
+        setDensity(next);
+        try { window.localStorage.setItem(DENSITY_KEY, next); } catch (error) { console.error('The list density could not be kept:', error); }
+    };
+    // the "recently played" order changes as songs play
+    const [playedTick, setPlayedTick] = useState(0);
+    useEffect(() => onPlayHistory(() => setPlayedTick(tick => tick + 1)), []);
+    // the row a shift-click selects from
+    const anchorId = useRef<string | null>(null);
+    const [order, setOrder] = useListOrder(orderKey, defaultOrder, orders);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeFilters, setActiveFilters] = useState<Set<FilterType>>(new Set());
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [cancelStage, setCancelStage] = useState<'cancel' | 'reset'>('cancel');
+    // Reset cancel stage when no jobs left
+    useEffect(() => { if (activeJobCount === 0) setCancelStage('cancel'); }, [activeJobCount]);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    const FILTERS: { id: FilterType; label: string; icon: React.ReactNode }[] = [
+        { id: 'made', label: t('filterMade'), icon: <Sparkles size={16} /> },
+        { id: 'imported', label: t('filterImported'), icon: <FileAudio size={16} /> },
+        { id: 'derived', label: t('filterDerived'), icon: <GitBranch size={16} /> },
+        { id: 'liked', label: t('liked'), icon: <Heart size={16} /> },
+        { id: 'karaoke', label: t('filterKaraoke'), icon: <Mic2 size={16} /> },
+        { id: 'versions', label: t('filterVersions'), icon: <Layers size={16} /> },
+        { id: 'generating', label: t('generatingStatus'), icon: <Loader2 size={16} /> }
+    ];
+
+    // Close filter dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setIsFilterOpen(false);
+            }
+        };
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setIsFilterOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, []);
+
+    useEffect(() => {
+        setSelectedIds(prev => {
+            if (prev.size === 0) return prev;
+            const validIds = new Set(songs.map(song => song.id));
+            const next = new Set<string>();
+            prev.forEach(id => {
+                if (validIds.has(id)) next.add(id);
+            });
+            return next;
+        });
+    }, [songs]);
+
+    const toggleFilter = (filterId: FilterType) => {
+        setActiveFilters(prev => {
+            const newFilters = new Set(prev);
+            if (newFilters.has(filterId)) {
+                newFilters.delete(filterId);
+            } else {
+                newFilters.add(filterId);
+            }
+            return newFilters;
+        });
+    };
+
+    // the track a derived track was made from, found without a scan per row
+    const songsById = useMemo(() => new Map(songs.map(entry => [entry.id, entry])), [songs]);
+    // the cards are not songs yet, and a stem is part of its song: the count is of the songs
+    const librarySize = useMemo(
+        () => foldStems(songs.filter(song => !isCard(song)), librarySongs ?? songs).songs.length,
+        [songs, librarySongs],
+    );
+    // which songs have their stems unfolded
+    const [openStems, setOpenStems] = useState<Set<string>>(new Set());
+    const toggleStems = (songId: string) => setOpenStems(prev => {
+        const next = new Set(prev);
+        if (next.has(songId)) next.delete(songId);
+        else next.add(songId);
+        return next;
+    });
+
+    const words = useMemo(() => searchWords(searchQuery), [searchQuery]);
+
+    const filteredSongs = useMemo(() => {
+        return songs.filter(song => {
+            // 1. Search Logic
+            if (!songMatches(song, words)) return false;
+
+            // 2. Filter Logic
+            if (activeFilters.size === 0) return true;
+
+            const sources = SOURCE_FILTERS.filter(filter => activeFilters.has(filter));
+            if (sources.length) {
+                const source: FilterType = isImported(song) ? 'imported' : song.derived ? 'derived' : 'made';
+                if (!sources.includes(source)) return false;
+            }
+            if (activeFilters.has('liked') && !likedSongIds.has(song.id)) return false;
+            if (activeFilters.has('karaoke') && !song.lrcContent) return false;
+            if (activeFilters.has('versions') && !(song.audioVersions?.length)) return false;
+            if (activeFilters.has('generating') && !song.isGenerating) return false;
+
+            return true;
+        });
+    }, [songs, words, activeFilters, likedSongIds]);
+
+    const filteredUploads = useMemo(() => {
+        if (activeFilters.size > 0) return [];
+        if (!referenceTracks.length) return [];
+        return referenceTracks.filter(track => {
+            const title = track.filename.replace(/\.[^/.]+$/, '');
+            return nameMatches(title, words);
+        });
+    }, [referenceTracks, words, activeFilters]);
+
+    // The songs being made stay on top, newest first, and the newest finished
+    // song sits right under them: a card that finishes becomes the song in its
+    // own place instead of moving.
+    // a stem is shown under the song it came from, when that song is in the list
+    const { songs: listedSongs, stemsOf } = useMemo(
+        () => foldStems(filteredSongs, librarySongs ?? songs),
+        [filteredSongs, librarySongs, songs],
+    );
+
+    const listItems = useMemo(() => {
+        const newestFirst = (a: { createdAt: Date }, b: { createdAt: Date }) => b.createdAt.getTime() - a.createdAt.getTime();
+        const songItem = (song: Song) => ({ type: 'song' as const, id: song.id, createdAt: song.createdAt, song });
+        const cards = listedSongs.filter(isCard).map(songItem).sort(newestFirst);
+        // the finished songs follow in the order chosen; newest first, a card
+        // that finishes becomes the song in its own place instead of moving
+        const compare = compareBy(order, language);
+        const finished = [
+            ...listedSongs.filter(song => !isCard(song)).map(songItem),
+            ...filteredUploads.map(track => ({
+                type: 'upload' as const,
+                id: track.id,
+                createdAt: new Date(track.created_at || Date.now()),
+                track,
+            })),
+        ].sort((a, b) => compare(
+            a.type === 'song' ? a.song : { createdAt: a.createdAt, title: a.track.filename },
+            b.type === 'song' ? b.song : { createdAt: b.createdAt, title: b.track.filename },
+        ));
+        return [...cards, ...finished];
+    }, [listedSongs, filteredUploads, order, language, order === 'recentlyPlayed' ? playedTick : 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // what plays after a song: the list's songs in the order shown
+    const queue = useMemo(
+        () => listItems.flatMap(item => (item.type === 'song' && !isCard(item.song) && item.song.audioUrl ? [item.song] : [])),
+        [listItems],
+    );
+
+    // what a selection can reach is what is on screen: folded stems are not
+    const selectableSongs = useMemo(
+        () => listedSongs.filter(song => !isCard(song)).flatMap(song => [song, ...(openStems.has(song.id) ? stemsOf.get(song.id) ?? [] : [])]),
+        [listedSongs, openStems, stemsOf]
+    );
+
+    const allSelected = selectableSongs.length > 0 && selectableSongs.every(song => selectedIds.has(song.id));
+    const selectedSongs = selectableSongs.filter(song => selectedIds.has(song.id));
+    const allSelectedLiked = selectedSongs.length > 0 && selectedSongs.every(song => likedSongIds.has(song.id));
+
+    const leaveSelection = () => {
+        setIsSelecting(false);
+        setSelectedIds(new Set());
+        anchorId.current = null;
+    };
+    // a click marks one row; with shift, every row from the last one marked
+    const toggleSelected = (song: Song, range: boolean) => {
+        if (isCard(song)) return;
+        const order = selectableSongs.map(entry => entry.id);
+        const from = anchorId.current ? order.indexOf(anchorId.current) : -1;
+        const to = order.indexOf(song.id);
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (range && from >= 0 && to >= 0) {
+                const mark = prev.has(anchorId.current!) ;
+                order.slice(Math.min(from, to), Math.max(from, to) + 1).forEach(id => (mark ? next.add(id) : next.delete(id)));
+            } else if (next.has(song.id)) next.delete(song.id);
+            else next.add(song.id);
+            return next;
+        });
+        if (!range) anchorId.current = song.id;
+    };
+    // Escape leaves the selection, Ctrl+A marks every row, as in a file manager
+    useEffect(() => {
+        if (!isSelecting) return undefined;
+        const key = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+            if (event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"]')) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                leaveSelection();
+            } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+                event.preventDefault();
+                setSelectedIds(new Set(selectableSongs.map(song => song.id)));
+            }
+        };
+        window.addEventListener('keydown', key);
+        return () => window.removeEventListener('keydown', key);
+    }, [isSelecting, selectableSongs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const [downloading, setDownloading] = useState(false);
+    const downloadSelected = async () => {
+        setDownloading(true);
+        try {
+            for (const song of selectedSongs.filter(entry => entry.audioUrl)) await downloadSongAudio(song);
+        } catch (error) {
+            console.error('Download failed:', error);
+            window.alert(error instanceof Error ? error.message : String(error));
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    // one row for a song and for each of its stems; a song keeps the key of the
+    // row it took over, so a finished card turns into its song in place
+    const renderSong = (song: Song, play: () => void, nested = false) => (
+        <SongItem
+            key={song.viewKey ?? song.id}
+            song={song}
+            nested={nested}
+            isCurrent={currentSong?.id === song.id}
+            isSelected={selectedSong?.id === song.id}
+            isSelectionMode={isSelecting}
+            compact={density === 'compact'}
+            isChecked={selectedIds.has(song.id)}
+            isLiked={likedSongIds.has(song.id)}
+            isPlaying={isPlaying}
+            isOwner={ownsSong(user, song)}
+            onPlay={play}
+            onSelect={() => onSelect(song)}
+            onRowClick={isSelecting && !isCard(song) ? (range) => toggleSelected(song, range) : undefined}
+            onOpenOriginal={(() => {
+                const original = song.derived ? songsById.get(song.derived.from) : undefined;
+                return original ? () => onSelect(original) : undefined;
+            })()}
+            onToggleSelect={(range) => toggleSelected(song, range)}
+            onToggleLike={() => onToggleLike(song.id)}
+            onAddToPlaylist={() => onAddToPlaylist(song)}
+            onOpenCoverRegen={() => onOpenCoverRegen && onOpenCoverRegen(song)}
+            onShowDetails={onShowDetails ? () => onShowDetails(song) : undefined}
+            detailsOpen={detailsSongId === song.id}
+            onDelete={onDeleteMany && !isCard(song) ? () => onDeleteMany([song]) : undefined}
+            onNavigateToProfile={onNavigateToProfile}
+            onSongUpdate={onSongUpdate}
+            // a card can be stopped once the engine has its job
+            onCancelJob={(() => {
+              const jobId = song.isGenerating ? song.jobId : undefined;
+              return jobId ? () => onCancelJob?.(jobId) : undefined;
+            })()}
+            onResetJob={
+              song.stage === 'cancelled' || song.stage === 'failed'
+                ? () => onResetJob?.(song.jobId || song.id)
+                : undefined
+            }
+            onScoreAgain={song.stage === 'failed' && (song.failureCode === 'score_unsingable_strength' || song.failureCode === 'not_audio') && onScoreAgain
+                ? () => onScoreAgain(song.jobId || song.id, song.failureCode === 'not_audio' ? 'again' : 'score-strength')
+                : undefined}
+        />
+    );
+
+    return (
+        <div className={embedded ? 'min-w-0' : 'h-full min-w-0 flex-1 overflow-y-auto bg-white p-4 pb-32 transition-colors duration-300 dark:bg-black sm:p-6'}>
+            <div className={embedded ? 'w-full min-w-0' : 'mx-auto w-full min-w-0 max-w-5xl'}> {/* Container constraint */}
+
+                {/* Header */}
+                <div className="flex flex-col gap-6 mb-8">
+                    {/* The library is a real local store, so the header states what
+                        is in it rather than naming a workspace concept that this
+                        single-user desktop build does not have. */}
+                    <div className={`items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 ${embedded ? 'hidden' : 'flex'}`}>
+                        {scopeName ? (
+                            <span className="flex min-w-0 items-center gap-1.5 font-medium text-zinc-900 dark:text-white">
+                                <ListMusic size={14} className="shrink-0" />
+                                <span className="truncate">{t('playlist')} · {scopeName}</span>
+                            </span>
+                        ) : (
+                            <span className="font-medium text-zinc-900 dark:text-white">{t('library')}</span>
+                        )}
+                        <span className="text-zinc-400 dark:text-zinc-600">·</span>
+                        <span>{songCount(librarySize)}</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative group min-w-48 flex-1">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={t('searchYourSongs')}
+                                className="w-full bg-zinc-100 dark:bg-suno-panel border border-zinc-200 dark:border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-hidden focus:border-zinc-400 dark:focus:border-white/20 placeholder-zinc-500 dark:placeholder-zinc-600 transition-colors"
+                            />
+                            <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
+                        </div>
+
+                        <div className="relative" ref={filterRef}>
+                            <button
+                                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                                className={`
+                        border text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all select-none
+                        ${isFilterOpen || activeFilters.size > 0
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-black border-transparent'
+                                        : 'bg-zinc-100 dark:bg-suno-panel hover:bg-zinc-200 dark:hover:bg-white/5 border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-white'
+                                    }
+                    `}
+                            >
+                                <Filter size={14} fill={activeFilters.size > 0 ? "currentColor" : "none"} />
+                                <span>{t('filters')} {activeFilters.size > 0 && `(${activeFilters.size})`}</span>
+                            </button>
+
+                            {/* Filter Dropdown */}
+                            {isFilterOpen && (
+                                <div role="menu" className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                                    <div className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                        {t('refineBy')}
+                                    </div>
+                                    {FILTERS.map(filter => (
+                                        <button
+                                            key={filter.id}
+                                            onClick={() => toggleFilter(filter.id)}
+                                            className="w-full text-left px-4 py-2.5 flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors group"
+                                        >
+                                            <div className="flex items-center gap-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-black dark:group-hover:text-white">
+                                                <span className="text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">
+                                                    {filter.icon}
+                                                </span>
+                                                {filter.label}
+                                            </div>
+                                            <div className={`
+                                     w-4 h-4 rounded border flex items-center justify-center transition-all
+                                     ${activeFilters.has(filter.id)
+                                                    ? 'bg-pink-600 border-pink-600'
+                                                    : 'border-zinc-300 dark:border-zinc-600 group-hover:border-zinc-400 dark:group-hover:border-zinc-500'
+                                                }
+                                 `}>
+                                                {activeFilters.has(filter.id) && <Check size={10} className="text-white" strokeWidth={4} />}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <SortMenu order={order} orders={orders} onChange={setOrder} />
+
+                        <button
+                            type="button"
+                            onClick={() => chooseDensity(density === 'compact' ? 'comfortable' : 'compact')}
+                            aria-pressed={density === 'compact'}
+                            {...named(density === 'compact' ? t('listComfortable') : t('listCompact'))}
+                            className="flex select-none items-center rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2.5 text-zinc-700 transition-all hover:bg-zinc-200 dark:border-white/10 dark:bg-suno-panel dark:text-white dark:hover:bg-white/5"
+                        >
+                            {density === 'compact' ? <Rows3 size={14} /> : <Rows4 size={14} />}
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                if (isSelecting) leaveSelection();
+                                else setIsSelecting(true);
+                            }}
+                            aria-pressed={isSelecting}
+                            className={`border text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all select-none ${isSelecting
+                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-black border-transparent'
+                                    : 'bg-zinc-100 dark:bg-suno-panel hover:bg-zinc-200 dark:hover:bg-white/5 border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-white'
+                                }`}
+                        >
+                            {t('select')}
+                        </button>
+
+                        {activeJobCount > 0 && onCancelAll && (
+                            <button
+                                onClick={() => {
+                                    if (cancelStage === 'cancel') {
+                                        onCancelAll();
+                                        setCancelStage('reset');
+                                    } else {
+                                        onResetAll?.();
+                                        setCancelStage('cancel');
+                                    }
+                                }}
+                                className={`border text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all select-none ${
+                                    cancelStage === 'reset'
+                                        ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/50 text-red-400 animate-pulse'
+                                        : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-500'
+                                }`}
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                {cancelStage === 'reset' ? t('stopEverything') : t('cancelAll')} ({activeJobCount})
+                            </button>
+                        )}
+                    </div>
+
+                    {(searchQuery || activeFilters.size > 0) && listItems.length > 0 && (
+                        <p className="-mt-3 text-xs text-zinc-500" role="status">
+                            {t('shownOf').replace('{shown}', String(listItems.length)).replace('{total}', String(songs.length))}
+                        </p>
+                    )}
+                </div>
+
+                {isSelecting && (
+                        <div className="sticky top-0 z-30 -mt-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/95 px-4 py-3 shadow-lg backdrop-blur-sm dark:border-white/10 dark:bg-zinc-900/95">
+                            <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-300" role="status">
+                                {selectedSongs.length} {t('nSelected')}
+                                <span className="hidden text-xs text-zinc-400 lg:inline">{t('selectionKeysHint')}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        const next = new Set<string>();
+                                        if (!allSelected) {
+                                            selectableSongs.forEach(song => next.add(song.id));
+                                        }
+                                        setSelectedIds(next);
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20"
+                                >
+                                    {allSelected ? t('clearAll') : t('selectAll')}
+                                </button>
+                                {songActions.queue && (
+                                    <>
+                                        <button
+                                            onClick={() => selectedSongs.length && songActions.queue?.(selectedSongs, true)}
+                                            disabled={!selectedSongs.length}
+                                            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:border-zinc-200 disabled:text-zinc-400 dark:border-white/20 dark:text-zinc-200 dark:hover:bg-white/10 dark:disabled:border-white/10"
+                                        >
+                                            <ListStart size={14} />
+                                            {t('playNextMenu')}
+                                        </button>
+                                        <button
+                                            onClick={() => selectedSongs.length && songActions.queue?.(selectedSongs, false)}
+                                            disabled={!selectedSongs.length}
+                                            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:border-zinc-200 disabled:text-zinc-400 dark:border-white/20 dark:text-zinc-200 dark:hover:bg-white/10 dark:disabled:border-white/10"
+                                        >
+                                            <ListEnd size={14} />
+                                            {t('addToQueueMenu')}
+                                        </button>
+                                    </>
+                                )}
+                                <button
+                                    onClick={() => selectedSongs.filter(song => likedSongIds.has(song.id) === allSelectedLiked).forEach(song => onToggleLike(song.id))}
+                                    disabled={!selectedSongs.length}
+                                    aria-pressed={allSelectedLiked}
+                                    className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:border-zinc-200 disabled:text-zinc-400 dark:border-white/20 dark:text-zinc-200 dark:hover:bg-white/10 dark:disabled:border-white/10"
+                                >
+                                    <Heart size={14} fill={allSelectedLiked ? 'currentColor' : 'none'} />
+                                    {allSelectedLiked ? t('unlikeSelected') : t('likeSelected')}
+                                </button>
+                                <button
+                                    onClick={() => void downloadSelected()}
+                                    disabled={!selectedSongs.length || downloading}
+                                    className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:border-zinc-200 disabled:text-zinc-400 dark:border-white/20 dark:text-zinc-200 dark:hover:bg-white/10 dark:disabled:border-white/10"
+                                >
+                                    {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                    {t('download')}
+                                </button>
+                                {onAddManyToPlaylist && (
+                                    <button
+                                        onClick={() => {
+                                            if (!selectedSongs.length) return;
+                                            onAddManyToPlaylist(selectedSongs);
+                                        }}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${selectedSongs.length
+                                                ? 'border-zinc-300 dark:border-white/20 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10'
+                                                : 'border-zinc-200 dark:border-white/10 text-zinc-400 cursor-not-allowed'
+                                            }`}
+                                        disabled={!selectedSongs.length}
+                                    >
+                                        <ListPlus size={14} />
+                                        {t('addToPlaylist')}
+                                    </button>
+                                )}
+                                {onMidiMany && (
+                                    <button
+                                        onClick={() => {
+                                            if (!selectedSongs.length) return;
+                                            onMidiMany(selectedSongs);
+                                        }}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${selectedSongs.length
+                                                ? 'border-zinc-300 dark:border-white/20 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10'
+                                                : 'border-zinc-200 dark:border-white/10 text-zinc-400 cursor-not-allowed'
+                                            }`}
+                                        disabled={!selectedSongs.length}
+                                    >
+                                        <Piano size={14} />
+                                        {t('midiForSelected')}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => {
+                                        if (!selectedSongs.length) return;
+                                        onDeleteMany?.(selectedSongs);
+                                        leaveSelection();
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${selectedSongs.length
+                                            ? 'border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10'
+                                            : 'border-zinc-200 dark:border-white/10 text-zinc-400 cursor-not-allowed'
+                                        }`}
+                                    disabled={!selectedSongs.length}
+                                >
+                                    {t('delete')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                {/* List */}
+                <div className="space-y-2"> {/* Reduced vertical spacing */}
+                    {listItems.length === 0 && loading ? (
+                        <div className="flex h-64 items-center justify-center gap-2 text-sm text-zinc-500" role="status">
+                            <Loader2 size={16} className="animate-spin" />
+                            {t('libraryLoading')}
+                        </div>
+                    ) : listItems.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-zinc-500 space-y-4 border border-dashed border-zinc-200 dark:border-white/5 rounded-2xl bg-zinc-50 dark:bg-white/2">
+                            <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
+                                {!searchQuery && activeFilters.size === 0 ? <ListMusic size={32} /> : <Filter size={32} />}
+                            </div>
+                            {!searchQuery && activeFilters.size === 0 ? (
+                                <p className="max-w-xs text-center font-medium">{emptyMessage ?? (scopeName ? t('playlistEmptyCreate') : t('noSongsYet'))}</p>
+                            ) : (
+                                <>
+                                    <p className="font-medium">{t('noSongsMatchFilters')}</p>
+                                    <button
+                                        onClick={() => { setActiveFilters(new Set()); setSearchQuery(''); }}
+                                        className="text-pink-600 dark:text-pink-500 text-sm font-bold hover:underline"
+                                    >
+                                        {t('clearFilters')}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        listItems.map((item) => (
+                            item.type === 'song' ? (
+                                <React.Fragment key={item.song.viewKey ?? item.id}>
+                                    {renderSong(item.song, () => onPlay(item.song, queue))}
+                                    {(stemsOf.get(item.song.id)?.length ?? 0) > 0 && (
+                                        <div className="pl-[5.5rem]">
+                                            <StemsToggle
+                                                stems={stemsOf.get(item.song.id) ?? []}
+                                                open={openStems.has(item.song.id)}
+                                                onToggle={() => toggleStems(item.song.id)}
+                                            />
+                                            {openStems.has(item.song.id) && (
+                                                <div className="mt-1 space-y-2 border-l border-zinc-200 pl-3 dark:border-white/10">
+                                                    {(stemsOf.get(item.song.id) ?? []).map(stem => renderSong(stem, () => onPlay(stem, [stem]), true))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </React.Fragment>
+                            ) : (
+                                <UploadItem
+                                    key={`upload_${item.id}`}
+                                    track={item.track}
+                                    onPlay={(audioUrl, title) => {
+                                        onPlay({
+                                            id: `upload_${item.id}`,
+                                            title,
+                                            lyrics: '',
+                                            style: 'Upload',
+                                            coverUrl: '',
+                                            duration: '0:00',
+                                            createdAt: item.createdAt,
+                                            tags: [],
+                                            audioUrl,
+                                            isPublic: false,
+                                        } as Song);
+                                    }}
+                                />
+                            )
+                        ))
+                    )}
+                </div>
+            </div> {/* End container */}
+        </div>
+    );
+};
+
+interface SongItemProps {
+    song: Song;
+    isCurrent: boolean;
+    isSelected: boolean;
+    isSelectionMode: boolean;
+    /** One line per song: small cover, title, length and the main actions. */
+    compact?: boolean;
+    isChecked: boolean;
+    isLiked: boolean;
+    isPlaying: boolean;
+    isOwner: boolean;
+    onPlay: () => void;
+    onSelect: () => void;
+    /** In the selection, a click on the row marks it; true when shift holds, for a range. */
+    onRowClick?: (range: boolean) => void;
+    onToggleSelect: (range: boolean) => void;
+    onToggleLike: () => void;
+    onAddToPlaylist: () => void;
+    onOpenCoverRegen?: () => void;
+    onShowDetails?: () => void;
+    detailsOpen?: boolean;
+    onDelete?: () => void;
+    onNavigateToProfile?: (username: string) => void;
+    onSongUpdate?: (updatedSong: Song) => void;
+    onCancelJob?: () => void;
+    onResetJob?: () => void;
+    onScoreAgain?: () => void;
+    /** Opens the track this one was made from; absent when it is gone. */
+    onOpenOriginal?: () => void;
+    /** A stem shown under its song: its name stands where the badge naming the song would. */
+    nested?: boolean;
+}
+
+export const SongItem: React.FC<SongItemProps> = ({
+    song,
+    isCurrent,
+    isSelected,
+    isSelectionMode,
+    compact = false,
+    isChecked,
+    isLiked,
+    isPlaying,
+    isOwner,
+    onPlay,
+    onSelect,
+    onRowClick,
+    onToggleSelect,
+    onToggleLike,
+    onAddToPlaylist,
+    onOpenCoverRegen,
+    onShowDetails,
+    detailsOpen = false,
+    onDelete,
+    onNavigateToProfile,
+    onSongUpdate,
+    onCancelJob,
+    onResetJob,
+    onScoreAgain,
+    onOpenOriginal,
+    nested = false,
+}) => {
+    const { t, language } = useI18n();
+    const stemName = useStemName();
+    const [showDropdown, setShowDropdown] = useState(false);
+    // the same menu, opened by a right click where the pointer is
+    const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const songActions = useSongActions();
+    const [editedTitle, setEditedTitle] = useState(song.title);
+    const titleInputRef = useRef<HTMLInputElement>(null);
+    // the row may have been a card when it mounted, so the field starts from the title it shows now
+    const startEditingTitle = () => {
+        setEditedTitle(song.title);
+        setIsEditingTitle(true);
+    };
+
+    useEffect(() => {
+        if (isEditingTitle && titleInputRef.current) {
+            titleInputRef.current.focus();
+            titleInputRef.current.select();
+        }
+    }, [isEditingTitle]);
+
+    const handleSaveTitle = async () => {
+        if (!isOwner || !editedTitle.trim() || editedTitle === song.title) {
+            setIsEditingTitle(false);
+            setEditedTitle(song.title);
+            return;
+        }
+
+        try {
+            const updated = await updateNativeSong(song, { title: editedTitle.trim() });
+            setIsEditingTitle(false);
+            onSongUpdate?.(updated);
+        } catch (error) {
+            console.error('Failed to update title:', error);
+            setEditedTitle(song.title);
+            setIsEditingTitle(false);
+        }
+    };
+
+    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSaveTitle();
+        } else if (e.key === 'Escape') {
+            setEditedTitle(song.title);
+            setIsEditingTitle(false);
+        }
+    };
+
+    return (
+        <>
+        <div
+            data-mcp-context={`song ${song.id}: ${song.title}`}
+            onClick={(event) => (onRowClick ? onRowClick(event.shiftKey) : onSelect())}
+            onContextMenu={(event) => {
+                if (isCard(song) || song.id.startsWith('upload_')) return;
+                event.preventDefault();
+                setShowDropdown(false);
+                setMenuAt({ x: event.clientX, y: event.clientY });
+            }}
+            draggable={Boolean(song.audioUrl) && !song.isGenerating}
+            onDragStart={(e) => {
+                if (!song.audioUrl || song.isGenerating) return;
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('application/x-ace-audio', JSON.stringify({
+                    url: song.audioUrl,
+                    title: song.title || 'Untitled',
+                    source: 'song',
+                }));
+                const preview = createDragPreview(e.currentTarget);
+                const rect = e.currentTarget.getBoundingClientRect();
+                const offsetX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+                const offsetY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+                e.dataTransfer.setDragImage(preview, offsetX, offsetY);
+                setTimeout(() => {
+                    try {
+                        preview.remove();
+                    } catch {
+                        // ignore
+                    }
+                }, 0);
+            }}
+            className={`group flex min-w-0 items-center gap-2 rounded-lg border transition-all hover:bg-zinc-100 dark:hover:bg-suno-card sm:gap-4 ${compact ? 'px-2 py-1' : 'p-2'} ${isSelected || isChecked ? 'bg-zinc-100 dark:bg-suno-card border-zinc-200 dark:border-white/10' : 'border-transparent bg-transparent'} ${song.audioUrl && !song.isGenerating ? (onRowClick ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing') : ''}`}
+        >
+            {isSelectionMode && (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSelect(e.shiftKey);
+                    }}
+                    className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isChecked
+                            ? 'bg-pink-600 border-pink-600 text-white'
+                            : 'border-zinc-300 dark:border-zinc-600 text-transparent hover:border-zinc-400 dark:hover:border-zinc-500'
+                        } ${isCard(song) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    disabled={isCard(song)}
+                    aria-pressed={isChecked}
+                >
+                    <Check size={12} strokeWidth={3} className={isChecked ? 'text-white' : 'text-transparent'} />
+                </button>
+            )}
+
+            {/* Cover Art - Reduced size */}
+            <div className={`relative shrink-0 rounded-md bg-zinc-200 dark:bg-zinc-800 overflow-hidden shadow-xs group/image ${compact ? 'h-10 w-10' : 'h-16 w-16'}`}>
+                <SongCover song={song} size="full" className={`w-full h-full transition-opacity ${song.isGenerating ? 'opacity-20 blur-xs' : 'opacity-100'}`} />
+
+                {song.isGenerating ? (
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1">
+                        {song.queuePosition ? (
+                            /* Queue indicator */
+                            <>
+                                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                    <Clock size={14} className="text-amber-400" />
+                                </div>
+                                <span className="text-[10px] font-medium text-amber-400 leading-none">#{song.queuePosition}</span>
+                            </>
+                        ) : (
+                            /* Generating - Music Waveform Animation */
+                            <div className="flex items-end gap-1 h-6">
+                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
+                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
+                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
+                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <button
+                        type="button"
+                        aria-label={`${isCurrent && isPlaying ? t('pause') : t('play')}: ${song.title}`}
+                        aria-pressed={isCurrent && isPlaying}
+                        className={`absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px] cursor-pointer transition-opacity duration-200 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pink-500 ${isCurrent ? 'opacity-100' : 'opacity-0 group-hover/image:opacity-100'}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPlay();
+                        }}
+                    >
+                        <div className={`rounded-full bg-white flex items-center justify-center shadow-lg transform transition-transform hover:scale-105 ${compact ? 'h-7 w-7' : 'h-10 w-10'}`}>
+                            {isCurrent && isPlaying ? (
+                                <Pause fill="black" className={`text-black ${compact ? 'h-3.5 w-3.5' : 'h-5 w-5'}`} />
+                            ) : (
+                                <Play fill="black" className={`text-black ml-0.5 ${compact ? 'h-3.5 w-3.5' : 'h-5 w-5'}`} />
+                            )}
+                        </div>
+                    </button>
+                )}
+            </div>
+
+            {/* Content */}
+            <div className={`flex-1 min-w-0 ${compact ? 'flex items-center gap-2 sm:gap-3' : 'flex flex-col justify-between py-1'}`}>
+                <div className={compact ? 'min-w-0 flex-1' : 'space-y-1'}>
+                    <div className="flex items-center gap-2">
+                        {isEditingTitle && isOwner ? (
+                            <input
+                                ref={titleInputRef}
+                                type="text"
+                                value={editedTitle}
+                                onChange={(e) => setEditedTitle(e.target.value)}
+                                onBlur={handleSaveTitle}
+                                onKeyDown={handleTitleKeyDown}
+                                onClick={(e) => e.stopPropagation()}
+                                className={`font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-sm border border-pink-500 focus:outline-hidden text-zinc-900 dark:text-white min-w-0 flex-1 ${compact ? 'text-sm' : 'text-lg'}`}
+                            />
+                        ) : (
+                            <h3
+                                className={`min-w-0 font-bold truncate ${compact ? 'text-sm' : 'text-lg'} ${isCurrent ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-900 dark:text-white'} ${isOwner && !song.isGenerating ? 'cursor-pointer hover:underline' : ''}`}
+                                onClick={(e) => {
+                                    if (isOwner && !song.isGenerating) {
+                                        e.stopPropagation();
+                                        startEditingTitle();
+                                    }
+                                }}
+                            >
+                                {song.title || (song.isGenerating ? (song.queuePosition ? t('queued') || "Queued..." : (t(song.stage as TranslationKey) || song.stage || t('creating') || "Creating...")) : t('untitled') || "Untitled")}
+                            </h3>
+                        )}
+                        {isOwner && !song.isGenerating && !isEditingTitle && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); startEditingTitle(); }}
+                                className="shrink-0 rounded-sm p-1 text-zinc-400 opacity-0 transition-opacity hover:text-black focus-visible:opacity-100 group-hover:opacity-100 dark:hover:text-white"
+                                title={t('renameSong')}
+                                aria-label={t('renameSong')}
+                            >
+                                <Pencil size={14} />
+                            </button>
+                        )}
+                        {nested ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-xs border border-zinc-300 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:border-white/15 dark:text-zinc-300">
+                                <StemIcon song={song} size={11} />
+                                {stemName(song)}
+                            </span>
+                        ) : song.derived && !compact && (
+                            <button
+                                type="button"
+                                disabled={!onOpenOriginal}
+                                onClick={(event) => { event.stopPropagation(); onOpenOriginal?.(); }}
+                                title={onOpenOriginal ? t('openOriginal') : t('originalGone')}
+                                className="inline-flex max-w-full items-center gap-1 truncate rounded-xs border border-zinc-300 px-1.5 py-0.5 text-[10px] text-zinc-600 hover:border-pink-400 hover:text-pink-600 disabled:cursor-default disabled:hover:border-zinc-300 disabled:hover:text-zinc-600 dark:border-white/15 dark:text-zinc-300"
+                            >
+                                {t('madeFrom')} «{song.derived.fromTitle}» · {t(`derivedTool_${song.derived.tool}` as TranslationKey)}
+                                {stemOf(song) !== null ? `: ${stemName(song)}` : ''}
+                            </button>
+                        )}
+                        <span
+                          className={`hidden sm:inline-flex shrink-0 items-center justify-center text-[9px] font-bold text-white bg-linear-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-xs shadow-xs`}
+                          title={[
+                            `DiT: ${song.ditModel || '?'}`,
+                            // Only show LM line when a real local model was used
+                            // for this track. With run-no-lm.bat or when text was
+                            // generated through OpenRouter, lmModel is empty/null
+                            // and "LM: ? (pt)" is just noise.
+                            song.lmModel ? `LM: ${song.lmModel} (${song.lmBackend || '?'})` : null,
+                            song.openrouterModel ? `Text: openrouter (${song.openrouterModel})` : null,
+                          ].filter(Boolean).join(' | ')}
+                        >
+                            {getProfileBadge(song)}
+                        </span>
+                        {!compact && song.generationTime != null && song.generationTime > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-zinc-400 dark:text-zinc-500" title={t('generationTime') || 'Generation time'}>
+                                <Timer size={10} />
+                                {song.generationTime}s
+                            </span>
+                        )}
+                    </div>
+                    <div className={`flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 ${compact ? 'hidden' : 'h-5'}`}>
+                        <span>{song.ditModel === 'imported-audio' ? t('importedAudio') : 'YuE2'}</span>
+                        {song.nativeReplayAvailable && <span title={t('replayAvailable')} className="rounded-sm bg-zinc-200/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide dark:bg-white/10">replay</span>}
+                        {song.cutShort && (song.cutShort === 'length' && song.nativeReplayAvailable && songActions.replay ? (
+                            <button
+                                type="button"
+                                title={t('cutShortLength')}
+                                onClick={event => { event.stopPropagation(); songActions.replay?.(song); }}
+                                className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200 dark:bg-amber-400/15 dark:text-amber-200"
+                            >
+                                {t('cutShort')}
+                            </button>
+                        ) : (
+                            <span title={t(song.cutShort === 'length' ? 'cutShortLength' : 'cutShortMemory')} className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
+                                {t('cutShort')}
+                            </span>
+                        ))}
+                        {song.tracksAsked && (
+                            <span title={t('tracksForCardHint').replace('{asked}', String(song.tracksAsked))} className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
+                                {t('tracksForCard')}
+                            </span>
+                        )}
+                    </div>
+                    <p className={`text-xs text-zinc-500 dark:text-zinc-500 font-medium max-w-2xl ${compact ? 'truncate' : 'line-clamp-2 pt-1'}`}>
+                        {captionSummary(song.style)}
+                    </p>
+                </div>
+
+                {/* One slot for the progress and, once the song is made, its
+                    actions: the row keeps its height when a card becomes a song. */}
+                {isCard(song) ? (
+                    <div className={compact ? 'w-24 shrink-0' : 'flex h-10 items-center pt-2'}>
+                        {song.isGenerating && (
+                            <div className="h-1 w-full rounded-full bg-zinc-200/70 dark:bg-white/10 overflow-hidden">
+                                <div
+                                    className={`h-full bg-linear-to-r from-pink-500 to-purple-600 transition-all ${song.progress === undefined ? 'opacity-40' : ''}`}
+                                    style={{
+                                        width: `${Math.min(
+                                            100,
+                                            Math.max(0, ((song.progress ?? 0) > 1 ? (song.progress ?? 0) / 100 : (song.progress ?? 0)) * 100)
+                                        )}%`,
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className={compact ? 'flex shrink-0 items-center gap-0.5' : 'flex h-10 items-center gap-1 pt-2'}>
+                        <button
+                            className={`flex items-center gap-1 ${compact ? 'p-2' : 'px-3 py-1.5'} rounded-full hover:bg-white/5 transition-colors ${isLiked ? 'text-pink-600 dark:text-pink-500 bg-pink-100 dark:bg-pink-500/10' : 'text-zinc-400 hover:text-black dark:hover:text-white'}`}
+                            onClick={(e) => { e.stopPropagation(); onToggleLike(); }}
+                            {...named(t('like'))}
+                            aria-pressed={isLiked}
+                        >
+                            <Heart size={16} fill={isLiked ? "currentColor" : "none"} />
+                            {(song.likeCount || 0) > 0 && (
+                                <span className="text-xs font-bold">{song.likeCount}</span>
+                            )}
+                        </button>
+
+                        {/* Manual cover regeneration — opens CoverRegenModal where the user can
+                            pick a model + prompt and either generate via Pollinations or
+                            upload a custom image from disk. Only shown for owned songs. */}
+                        {isOwner && !compact && (
+                            <button
+                                className="hidden p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors sm:block"
+                                onClick={(e) => { e.stopPropagation(); if (onOpenCoverRegen) onOpenCoverRegen(); }}
+                                {...named(t('coverRegen.openTooltip'))}
+                            >
+                                <ImagePlus size={16} />
+                            </button>
+                        )}
+
+                        {songActions.exportVideo && song.audioUrl && !song.isGenerating && !compact && (
+                            <button
+                                className="hidden p-2 rounded-full sm:block hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
+                                onClick={(e) => { e.stopPropagation(); songActions.exportVideo?.(song); }}
+                                {...named(t('videoExport'))}
+                            >
+                                <Clapperboard size={16} />
+                            </button>
+                        )}
+
+                        <button
+                            className={`p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors ${compact ? 'hidden sm:block' : 'ml-auto'}`}
+                            onClick={(e) => { e.stopPropagation(); onAddToPlaylist(); }}
+                            {...named(t('addToPlaylist'))}
+                        >
+                            <ListPlus size={16} />
+                        </button>
+
+                        {onDelete && (
+                            <button
+                                className={`p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-500/10 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors ${compact ? 'hidden sm:block' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                                {...named(t('delete'))}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+
+                        {onShowDetails && (
+                            <button
+                                className={`p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 transition-colors ${detailsOpen ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-black dark:hover:text-white'}`}
+                                onClick={(e) => { e.stopPropagation(); onShowDetails(); }}
+                                {...named(t('songDetails'))}
+                                aria-pressed={detailsOpen}
+                            >
+                                <Info size={16} />
+                            </button>
+                        )}
+
+                        <div className="relative">
+                            <button
+                                className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowDropdown(!showDropdown);
+                                }}
+                                {...named(t('moreActions'))}
+                                aria-haspopup="menu"
+                                aria-expanded={showDropdown}
+                            >
+                                <MoreHorizontal size={16} />
+                            </button>
+                            <SongDropdownMenu
+                                song={song}
+                                isOpen={showDropdown}
+                                onClose={() => setShowDropdown(false)}
+                            />
+                            {menuAt && (
+                                <SongDropdownMenu
+                                    song={song}
+                                    isOpen
+                                    at={menuAt}
+                                    onClose={() => setMenuAt(null)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Timestamp / Status */}
+            <div className={`text-xs font-mono text-zinc-500 dark:text-zinc-600 text-right ${compact ? (isCard(song) ? 'w-20 shrink-0 self-center' : 'hidden w-12 shrink-0 self-center sm:block') : 'self-start pt-1'}`}>
+                {song.isGenerating ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                        <span className={song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
+                            {song.queuePosition ? `#${song.queuePosition}` : (t(song.stage as TranslationKey) || song.stage || t('creating') || 'Creating...')}
+                        </span>
+                        {!song.queuePosition && song.stageDetail && <span className="text-[10px] text-zinc-500">{song.stageDetail}</span>}
+                        {song.memoryShort && <span className="text-[10px] text-amber-500" title={t('cardMemoryShortHint')}>{t('cardMemoryShort')}</span>}
+                        {onCancelJob && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onCancelJob(); }}
+                                className="text-[10px] text-zinc-500 hover:text-red-400 transition-colors font-sans"
+                            >
+                                {t('cancelGeneration')}
+                            </button>
+                        )}
+                    </div>
+                ) : song.stage === 'failed' && onResetJob ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-red-400 text-[10px] font-sans" title={song.failure}>{t('generationFailed')}</span>
+                        {onScoreAgain && (
+                            <button
+                                type="button"
+                                title={song.failure}
+                                onClick={(e) => { e.stopPropagation(); onScoreAgain(); }}
+                                className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200 dark:bg-amber-400/15 dark:text-amber-200"
+                            >
+                                {song.failureCode === 'not_audio' ? t('songAgain') : t('scoreAgainAtOne')}
+                            </button>
+                        )}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onResetJob(); }}
+                            className="text-[10px] text-zinc-500 hover:text-red-400 transition-colors font-sans"
+                        >
+                            {t('removeGeneration')}
+                        </button>
+                    </div>
+                ) : song.stage === 'cancelled' && onResetJob ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-red-400 text-[10px] font-sans" title={song.failure}>{t('generationStopped')}</span>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onResetJob(); }}
+                            className="text-[10px] text-red-400 hover:text-red-300 transition-colors font-sans font-bold"
+                        >
+                            {t('removeGeneration')}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-end gap-0.5">
+                        <span>{song.duration}</span>
+                        {/* when it was made: how long ago, the exact moment on hover */}
+                        <time dateTime={song.createdAt.toISOString()} title={exactMoment(song.createdAt, language)} className={`font-sans text-[10px] ${compact ? 'hidden' : ''}`}>
+                            {relativeMoment(song.createdAt, language)}
+                        </time>
+                    </div>
+                )}
+            </div>
+        </div>
+        </>
+    );
+};
+
+const NO_SONG_ACTIONS = {};
+
+const UploadItem: React.FC<{
+    track: { id: string; filename: string; audio_url: string; duration?: number | null };
+    onPlay: (audioUrl: string, title: string) => void;
+}> = ({ track, onPlay }) => {
+    const title = track.filename.replace(/\.[^/.]+$/, '');
+    const duration = track.duration
+        ? `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, '0')}`
+        : '--:--';
+    // an upload is not a library song yet: none of the song actions apply to it
+    return (
+        <SongActionsProvider value={NO_SONG_ACTIONS}>
+        <SongItem
+            song={{
+                id: `upload_${track.id}`,
+                title,
+                lyrics: '',
+                style: 'Upload',
+                coverUrl: '',
+                duration,
+                createdAt: new Date(),
+                tags: [],
+                audioUrl: track.audio_url,
+                isPublic: false,
+            } as Song}
+            isCurrent={false}
+            isSelected={false}
+            isSelectionMode={false}
+            isChecked={false}
+            isLiked={false}
+            isPlaying={false}
+            isOwner={false}
+            onPlay={() => onPlay(track.audio_url, title)}
+            onSelect={() => onPlay(track.audio_url, title)}
+            onToggleSelect={() => undefined}
+            onToggleLike={() => undefined}
+            onAddToPlaylist={() => undefined}
+            onNavigateToProfile={() => undefined}
+        />
+        </SongActionsProvider>
+    );
+};

@@ -1,0 +1,608 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SELF_READ, useKaraokeStatus } from '../services/studioQueries';
+import { karaokeReason, recogniseLyrics } from '../services/karaoke';
+import { Check, Copy, Download, FileAudio, KeyboardMusic, Loader2, Music, Play, RefreshCw, Scissors, Search, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { useI18n } from '../context/I18nContext';
+import { poll } from '../services/poll';
+import { saveFile } from '../services/saveFile';
+import { tempoAndKey } from '../services/songDownload';
+import { DevicePicker } from './DevicePicker';
+import { transcribeWithNativeOpenRouter } from '../services/nativeOpenRouter';
+import { apiUrl } from '../services/apiBase';
+import { openExternal } from '../services/externalLinks';
+import { StemPlayer } from './StemPlayer';
+import { mapNativeLibrarySong } from '../services/nativeLibrary';
+import type { NativeLibrarySong } from '../types';
+import type { TranslationKey } from '../i18n/translations';
+import { localizeModelNote } from '../i18n/modelNotes';
+import { stemOf } from '../services/songStems';
+import { derivedBy, libraryFailure, restoredOf, shownSongs, toolsSongOnOpen, type ToolRun } from '../services/toolsSong';
+import { RestoreTool } from './RestoreTool';
+import { ConfirmDialog } from './ConfirmDialog';
+import { MidiTool } from './midi/MidiTool';
+import { MidiEditor } from './midi/MidiEditor';
+import { WorkProgress } from './WorkProgress';
+
+/**
+ * Studio tools.
+ *
+ * Work done to a finished track rather than to a new one: splitting a song into
+ * its parts, and turning a reference recording into text you can paste into a
+ * lyric sheet. Both run through the studio's own service - the separator on the
+ * ONNX Runtime it already ships, the transcription through whichever recogniser
+ * the user connected.
+ *
+ * The page used to be diagnostics. Those moved to Settings, next to the flags
+ * that produce them, which left this page for the tools it is named after.
+ */
+
+
+interface SeparationStatus {
+  model: { label: string; bytes: number; installed: boolean; note: string };
+  runtime_installed: boolean;
+  ready: boolean;
+  stems: string[];
+  download: { downloaded_bytes: number; total_bytes: number; done: boolean } | null;
+  /** The card audio.cpp separates on: CUDA on an NVIDIA card that runs it, Vulkan on another make, Metal on a Mac. */
+  card: 'cuda' | 'vulkan' | 'metal' | null;
+  card_runtime_installed: boolean;
+  card_missing_bytes: number;
+  /** The separator: HT-Demucs for six stems, Mel-Band RoFormer for the vocals and the instrumental. */
+  engine?: 'htdemucs' | 'roformer';
+  settings: { stems: string[]; runtime: 'auto' | 'cuda' | 'cpu'; engine?: 'htdemucs' | 'roformer' };
+  run: { song_id: string; progress: number; started_ms: number; elapsed_ms?: number; done: boolean; error: string | null; stems: string[] } | null;
+}
+
+interface CatalogModel {
+  id: string;
+  name: string;
+  capabilities: string[];
+}
+
+const CARD = 'rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/3';
+const CONTROL =
+  'w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-hidden focus:border-pink-500 disabled:opacity-50 dark:border-white/10 dark:bg-black/30 dark:text-white';
+
+const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(0)} MB`;
+
+export function StudioToolsPanel({ initialSongId }: { initialSongId?: string | null } = {}): React.ReactElement {
+  const { t, language } = useI18n();
+
+  const [songs, setSongs] = useState<NativeLibrarySong[]>([]);
+  const [midiEditorOpen, setMidiEditorOpen] = useState(false);
+  const [songId, setSongId] = useState('');
+  const [status, setStatus] = useState<SeparationStatus | null>(null);
+  const [stems, setStems] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  // separating again replaces the stems the song has: asked first
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [asrModels, setAsrModels] = useState<CatalogModel[]>([]);
+  const [asrModel, setAsrModel] = useState('');
+  const [asrFile, setAsrFile] = useState<File | null>(null);
+  const [asrLanguage, setAsrLanguage] = useState('');
+  const [asrBusy, setAsrBusy] = useState(false);
+  const [asrText, setAsrText] = useState('');
+  const { data: karaoke } = useKaraokeStatus();
+  const karaokeRecogniser = Boolean(karaoke?.provider && karaoke.provider !== 'none');
+  const [chosenWay, setChosenWay] = useState<'karaoke' | 'openrouter' | null>(null);
+  // the karaoke recogniser hears the file on this computer when one is chosen; OpenRouter otherwise
+  const asrWay = chosenWay ?? (karaokeRecogniser ? 'karaoke' : 'openrouter');
+  const [copied, setCopied] = useState(false);
+  const [query, setQuery] = useState('');
+  const filePicker = useRef<HTMLInputElement | null>(null);
+
+  // an empty list before the library has answered is not "no songs"
+  const [songsLoaded, setSongsLoaded] = useState(false);
+  const [songsError, setSongsError] = useState<string | null>(null);
+  const loadSongs = useCallback(async () => {
+    try {
+      const response = await fetch('/v1/library/songs');
+      if (!response.ok) throw new Error(libraryFailure(response.status, await response.text()));
+      const body = await response.json();
+      const list: NativeLibrarySong[] = Array.isArray(body) ? body : body.songs ?? [];
+      const playable = list.filter(song => song.audio_path);
+      setSongs(playable);
+      setSongsError(null);
+      const runOf = (path: string) =>
+        fetch(path, { headers: SELF_READ })
+          .then(response => response.json() as Promise<{ run?: ToolRun | null }>)
+          .then(body => body.run ?? null)
+          .catch((error: unknown) => {
+            console.error(`[ERROR] the run at ${path} was not read:`, error);
+            return null;
+          });
+      const runs = await Promise.all([runOf('/v1/separation/status'), runOf('/v1/midi')]);
+      setSongId(current => current || toolsSongOnOpen(playable.map(song => song.id), runs));
+    } catch (failure) {
+      setSongsError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setSongsLoaded(true);
+    }
+  }, []);
+
+  // A track handed over by a menu wins over whatever was chosen here before.
+  useEffect(() => {
+    if (initialSongId) setSongId(initialSongId);
+  }, [initialSongId]);
+
+  useEffect(() => {
+    void loadSongs();
+    void fetch('/v1/openrouter/catalog')
+      .then(response => response.json())
+      .then((body: { models?: CatalogModel[] }) => {
+        const recognisers = (body.models ?? []).filter(model => model.capabilities.includes('speech_to_text'));
+        setAsrModels(recognisers);
+        setAsrModel(current => current || recognisers[0]?.id || '');
+      })
+      .catch(() => undefined);
+  }, [loadSongs]);
+
+  // The separation state, and which stems the chosen track already has.
+  const refresh = useCallback(async () => {
+    const separation: SeparationStatus = await fetch('/v1/separation/status', { headers: SELF_READ }).then(response => response.json());
+    setStatus(separation);
+    if (songId) {
+      const body = await fetch(`/v1/library/songs/${encodeURIComponent(songId)}/stems`, { headers: SELF_READ }).then(response => response.json());
+      setStems(body.stems ?? []);
+    }
+  }, [songId]);
+
+  useEffect(() => {
+    return poll(() => refresh().catch(() => undefined), 1000);
+  }, [refresh]);
+
+  const saveSettings = async (next: SeparationStatus['settings']) => {
+    setStatus(current => (current ? { ...current, settings: next } : current));
+    await fetch('/v1/separation/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next),
+    }).catch(() => undefined);
+  };
+
+  const install = async () => {
+    setBusy(true);
+    setError(null);
+    await fetch('/v1/separation/install', { method: 'POST' }).catch(() => undefined);
+    setBusy(false);
+  };
+
+  // a stem is a part of a song already: there is nothing in it to separate
+  const chosenIsStem = useMemo(() => {
+    const chosen = songs.find(song => song.id === songId);
+    return chosen ? stemOf(mapNativeLibrarySong(chosen)) !== null : false;
+  }, [songs, songId]);
+
+  const separate = async () => {
+    if (!songId) return;
+    setBusy(true);
+    setError(null);
+    const response = await fetch(`/v1/library/songs/${encodeURIComponent(songId)}/stems`, { method: 'POST' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      setError(body?.error || `Separation could not start (${response.status})`);
+    }
+    setBusy(false);
+  };
+
+  const transcribe = async () => {
+    if (!asrFile || (asrWay === 'openrouter' && !asrModel)) return;
+    setAsrBusy(true);
+    setError(null);
+    setAsrText('');
+    try {
+      const language = asrLanguage.trim() || undefined;
+      setAsrText(asrWay === 'karaoke'
+        ? await recogniseLyrics({ file: asrFile }, language)
+        : await transcribeWithNativeOpenRouter(asrModel, asrFile, language));
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason);
+      setError(karaokeReason(t, message) ?? message);
+    } finally {
+      setAsrBusy(false);
+    }
+  };
+
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(asrText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard permission is not worth an error banner.
+    }
+  };
+
+  // The list the user actually sees: filtered, and short enough to scan.
+  // A library of five thousand tracks is not a list to scroll: the search
+  // narrows it, and only the first handful of matches are drawn.
+  const needle = query.trim().toLowerCase();
+  const matches = needle ? songs.filter(song => song.title.toLowerCase().includes(needle)) : songs;
+  const visible = shownSongs(matches, songId, 12);
+  const hidden = matches.length - visible.length;
+  const settings = status?.settings ?? { stems: status?.stems ?? [], runtime: 'auto' as const };
+  // what separating again replaces: the stems it makes that the song has already
+  const replacing = stems.filter(stem => settings.stems.includes(stem));
+  const run = status?.run?.song_id === songId ? status?.run : null;
+  const running = Boolean(run && !run.done);
+  const percent = run && run.progress > 0 ? Math.round(run.progress * 100) : null;
+  const download = status?.download;
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-white px-5 py-6 dark:bg-suno md:px-8">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pink-500">{t('studioTools')}</p>
+            <h1 className="mt-1 text-2xl font-bold text-zinc-950 dark:text-white">{t('toolsHeading')}</h1>
+            <p className="mt-2 max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{t('toolsIntro')}</p>
+          </div>
+          <button
+            onClick={() => void loadSongs()}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-pink-400 hover:text-pink-600 dark:border-white/10 dark:text-zinc-200"
+          >
+            <RefreshCw size={15} /> {t('refresh')}
+          </button>
+        </div>
+
+        {/* Stems. */}
+        <section className={CARD}>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+            <Scissors size={17} className="text-pink-500" /> {t('stemsTitle')}
+          </div>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{status?.engine === 'roformer' ? t('stemsHintRoformer' as never) : t('stemsHint')}</p>
+
+          {/* A track is picked from a list, not from a native dropdown: a
+              generated title can be a whole paragraph, and an <option> shows
+              all of it, at any width it likes. */}
+          <div className="mt-3">
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder={t('searchYourSongs')}
+                className={`${CONTROL} pl-9`}
+              />
+            </div>
+            <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-zinc-200 dark:border-white/10">
+              {!songsLoaded && <Loader2 size={14} className="mx-3 my-3 animate-spin text-zinc-400" />}
+              {songsError && <p className="px-3 py-3 text-xs text-rose-600 dark:text-rose-300">{t('toolsSongsFailed').replace('{error}', songsError)}</p>}
+              {songsLoaded && !songsError && visible.length === 0 && (
+                <p className="px-3 py-3 text-xs text-zinc-500">{t('noSongsYet')}</p>
+              )}
+              {visible.map(song => (
+                <button
+                  key={song.id}
+                  type="button"
+                  onClick={() => setSongId(song.id)}
+                  className={`flex w-full items-center gap-2 border-b border-zinc-100 px-3 py-2 text-left last:border-b-0 dark:border-white/5 ${
+                    song.id === songId ? 'bg-pink-500/10' : 'hover:bg-zinc-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Music size={13} className={song.id === songId ? 'shrink-0 text-pink-500' : 'shrink-0 text-zinc-400'} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-zinc-800 dark:text-zinc-200">{song.title}</span>
+                  {song.id === songId && <Check size={14} className="shrink-0 text-pink-500" />}
+                </button>
+              ))}
+              {hidden > 0 && (
+                <p className="px-3 py-2 text-[11px] text-zinc-500">{t('searchNarrowsMore')} · {hidden}</p>
+              )}
+            </div>
+            {/* What to keep, and how carefully to join the segments. Both are
+                remembered, so the next track starts where this one left off. */}
+            <div className="mt-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">{t('separationWhichStems')}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(status?.stems ?? []).map(stem => {
+                  const chosen = settings.stems.includes(stem);
+                  return (
+                    <button
+                      key={stem}
+                      type="button"
+                      onClick={() => {
+                        const next = chosen ? settings.stems.filter(name => name !== stem) : [...settings.stems, stem];
+                        void saveSettings({ ...settings, stems: next });
+                      }}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                        chosen
+                          ? 'border-pink-400 bg-pink-500/10 text-zinc-900 dark:text-white'
+                          : 'border-zinc-200 text-zinc-500 dark:border-white/10'
+                      }`}
+                    >
+                      <span className={`grid h-3.5 w-3.5 place-items-center rounded-sm ${chosen ? 'bg-pink-500 text-white' : 'bg-zinc-200 dark:bg-white/10'}`}>
+                        {chosen && <Check size={9} strokeWidth={3} />}
+                      </span>
+                      {t(`stem_${stem}` as never) || stem}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Card or processor. The card needs its own build of the runtime,
+                which is listed with the other optional downloads. */}
+            <div className="mt-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">{t('separationRuntime')}</p>
+              <div className="mt-2">
+                <DevicePicker
+                  value={settings.runtime}
+                  onChange={choice => void saveSettings({ ...settings, runtime: choice })}
+                  cardAvailable={Boolean(status?.card && status?.card_runtime_installed)}
+                />
+              </div>
+              {/* Where a capability is installed is one place: the models
+                  panel. This tool used to install the card runtime itself, with
+                  its own button and its own progress, and disagree with it. */}
+              {status?.card && !status?.card_runtime_installed && status?.engine !== 'roformer' && (
+                <p className="mt-2 text-[11px] leading-4 text-amber-600 dark:text-amber-300">
+                  {t('separationInstallGpu')}
+                  {status?.card_missing_bytes ? ` · ${megabytes(status.card_missing_bytes)}` : ''}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => (replacing.length > 0 ? setConfirmReplace(true) : void separate())}
+              disabled={!status?.ready || !songId || chosenIsStem || settings.stems.length === 0 || running || busy}
+              className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              {stems.length > 0 ? t('stemsAgain') : t('stemsStart')}
+            </button>
+            {chosenIsStem && <p className="mt-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{t('stemOfStem')}</p>}
+            {/* the model is in place and the server it runs in is not (missing or of an earlier release): why Split waits */}
+            {status && status.model.installed && !status.ready && (
+              <p className="mt-2 text-xs leading-5 text-amber-600 dark:text-amber-300">
+                {t('updateWhyAudiocppServer')} ·{' '}
+                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('yue:open-settings', { detail: 'models' }))} className="underline underline-offset-2">
+                  {t('changeProfileHint')}
+                </button>
+              </p>
+            )}
+            <ConfirmDialog
+              isOpen={confirmReplace}
+              title={t('replaceStemsTitle')}
+              message={t('replaceStemsMessage').replace('{stems}', () => replacing.map(stem => t(`stem_${stem}` as TranslationKey)).join(', '))}
+              confirmLabel={t('replaceStemsConfirm')}
+              onConfirm={() => { setConfirmReplace(false); void separate(); }}
+              onCancel={() => setConfirmReplace(false)}
+            />
+          </div>
+
+          {status && !status.model.installed && (
+            <div className="mt-3 rounded-lg border border-zinc-200 p-3 dark:border-white/10">
+              <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-300">
+                {status.model.label} · {megabytes(status.model.bytes)} — {localizeModelNote(status.model.note, language)}
+              </p>
+              {download && !download.done ? (
+                <div className="mt-2">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-black/30">
+                    <div
+                      className="h-full bg-linear-to-r from-orange-500 to-pink-500 transition-[width]"
+                      style={{ width: `${Math.round((download.downloaded_bytes / Math.max(1, download.total_bytes)) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] tabular-nums text-zinc-500">
+                    {megabytes(download.downloaded_bytes)} / {megabytes(download.total_bytes)}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void install()}
+                  disabled={busy}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                >
+                  <Download size={13} /> {t('stemsInstallModel')}
+                </button>
+              )}
+            </div>
+          )}
+
+          {running && <WorkProgress label={t('stemsRunning')} percent={percent} elapsedMs={run?.elapsed_ms} />}
+
+          {stems.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {stems.map(stem => {
+                const url = apiUrl(`/v1/library/songs/${encodeURIComponent(songId)}/stems/${stem}`);
+                return (
+                  <div key={stem} className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <StemPlayer src={url} label={t(`stem_${stem}` as never) || stem} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const song = songs.find(candidate => candidate.id === songId);
+                        const tempoKey = song ? tempoAndKey((song.generation_settings as Record<string, unknown> | null | undefined)?.abc) : '';
+                        void saveFile(`${song?.title ?? 'track'} - ${stem}${tempoKey ? ` - ${tempoKey}` : ''}.wav`, { url });
+                      }}
+                      className="shrink-0 text-zinc-400 hover:text-pink-500"
+                      title={t('download')}
+                    >
+                      <Download size={15} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {run?.error && (
+            <p role="alert" className="mt-3 select-text rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-700 wrap-anywhere dark:text-rose-300">{run.error}</p>
+          )}
+        </section>
+
+        {/* Restore after compression, on the track chosen above or a file. */}
+        <RestoreTool
+          songId={songId}
+          songTitle={songs.find(song => song.id === songId)?.title ?? ''}
+          restoredId={restoredOf(songs, songId)}
+          chosenIsRestored={derivedBy(songs.find(song => song.id === songId), 'restore')}
+          card={CARD}
+          onDone={() => void loadSongs()}
+        />
+
+        {/* Audio to MIDI, on the track chosen above. */}
+        <MidiTool songId={songId} songTitle={songs.find(song => song.id === songId)?.title ?? ''} card={CARD} />
+
+        {/* The MIDI editor on a new song: played in, recorded, drawn. */}
+        <section className={CARD}>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+            <KeyboardMusic size={17} className="text-pink-500" /> {t('midiEdTitle')}
+          </div>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{t('midiEdIntro')}</p>
+          <button
+            type="button"
+            onClick={() => setMidiEditorOpen(true)}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 dark:border-white/15 dark:text-zinc-200"
+          >
+            <KeyboardMusic size={13} /> {t('midiEdOpen')}
+          </button>
+          {midiEditorOpen && <MidiEditor source={{ kind: 'new' }} onClose={() => setMidiEditorOpen(false)} />}
+        </section>
+
+        {/* The audio editor, on the track chosen above or on any stem it produced. */}
+        <section className={CARD}>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+            <SlidersHorizontal size={17} className="text-pink-500" /> {t('audioEditor')}
+          </div>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{t('audioEditorIntro')}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (!songId) return;
+                const url = apiUrl(`/v1/library/media/${encodeURIComponent(songId)}`);
+                void openExternal(apiUrl(`/editor/index.html?audioUrl=${encodeURIComponent(url)}`));
+              }}
+              disabled={!songId}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 disabled:opacity-50 dark:border-white/15 dark:text-zinc-200"
+            >
+              <SlidersHorizontal size={13} /> {t('openTrackInEditor')}
+            </button>
+            {stems.map(stem => (
+              <button
+                key={stem}
+                type="button"
+                onClick={() => {
+                  const url = apiUrl(`/v1/library/songs/${encodeURIComponent(songId)}/stems/${stem}`);
+                  void openExternal(apiUrl(`/editor/index.html?audioUrl=${encodeURIComponent(url)}`));
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:border-pink-400 hover:text-pink-600 dark:border-white/10 dark:text-zinc-300"
+              >
+                {t(`stem_${stem}` as never) || stem}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Processing: the same window the track menu opens, on the track chosen above. */}
+        <section className={CARD}>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+            <Wand2 size={17} className="text-pink-500" /> {t('processTitle')}
+          </div>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{t('processHint')}</p>
+          <button
+            type="button"
+            onClick={() => {
+              if (!songId) return;
+              void fetch(`/v1/library/songs/${encodeURIComponent(songId)}`)
+                .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+                .then(body => window.dispatchEvent(new CustomEvent('yue:process-song', { detail: mapNativeLibrarySong(body) })))
+                .catch(problem => setError(problem instanceof Error ? problem.message : String(problem)));
+            }}
+            disabled={!songId}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 disabled:opacity-50 dark:border-white/15 dark:text-zinc-200"
+          >
+            <Wand2 size={13} /> {t('processMenu')}
+          </button>
+        </section>
+
+        {/* Transcription. */}
+        <section className={CARD}>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-white">
+            <FileAudio size={17} className="text-pink-500" /> {t('transcribeAudio')}
+          </div>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{t('transcribeIntro')}</p>
+
+          <div role="radiogroup" aria-label={t('transcribeWay')} className="mt-3 inline-flex rounded-lg border border-zinc-200 p-0.5 text-xs font-semibold dark:border-white/10">
+            {(['karaoke', 'openrouter'] as const).map(way => (
+              <button
+                key={way}
+                type="button"
+                role="radio"
+                aria-checked={asrWay === way}
+                onClick={() => setChosenWay(way)}
+                title={t(way === 'karaoke' ? 'transcribeWayKaraokeHint' : 'transcribeWayOpenRouterHint')}
+                className={`rounded-md px-3 py-1.5 ${asrWay === way ? 'bg-pink-600 text-white' : 'text-zinc-600 hover:text-pink-600 dark:text-zinc-300'}`}
+              >
+                {t(way === 'karaoke' ? 'transcribeWayKaraoke' : 'transcribeWayOpenRouter')}
+              </button>
+            ))}
+          </div>
+          {asrWay === 'karaoke' && !karaokeRecogniser && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{t('karaokeNoRecogniser')}</p>}
+
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            {asrWay === 'openrouter' && (
+              <select value={asrModel} onChange={event => setAsrModel(event.target.value)} className={CONTROL}>
+                {asrModels.length === 0 && <option value="">{t('noSpeechModel')}</option>}
+                {asrModels.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={() => filePicker.current?.click()}
+              className={`${CONTROL} text-left ${asrFile ? '' : 'text-zinc-400'}`}
+            >
+              {asrFile?.name ?? t('chooseAudioFile')}
+            </button>
+            <input
+              value={asrLanguage}
+              onChange={event => setAsrLanguage(event.target.value)}
+              placeholder={t('languageOptional')}
+              className={CONTROL}
+            />
+          </div>
+          <input
+            ref={filePicker}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={event => { setAsrFile(event.target.files?.[0] ?? null); event.target.value = ''; }}
+          />
+
+          <button
+            type="button"
+            onClick={() => void transcribe()}
+            disabled={!asrFile || (asrWay === 'openrouter' ? !asrModel : !karaokeRecogniser) || asrBusy}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-linear-to-r from-orange-500 to-pink-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {asrBusy ? <Loader2 size={14} className="animate-spin" /> : <FileAudio size={14} />} {t('transcribeAudio')}
+          </button>
+
+          {asrText && (
+            <div className="mt-3">
+              <textarea readOnly value={asrText} rows={8} className={`${CONTROL} resize-y font-mono text-[13px] leading-5`} />
+              <button
+                type="button"
+                onClick={() => void copyText()}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:border-pink-400 hover:text-pink-600 dark:border-white/15 dark:text-zinc-200"
+              >
+                {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? t('copied') : t('copy')}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {error && (
+          <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">{error}</p>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,590 @@
+//! Decoding a finished track into what a recogniser can read.
+//!
+//! Library audio is MP3 or 24-bit WAV at 44.1 kHz; every speech recogniser here
+//! wants 16 kHz mono 16-bit PCM. Doing this in-process keeps the promise that
+//! the local runtime needs no Python and no ffmpeg on the user's machine.
+
+use std::fs::File;
+use std::path::Path;
+
+use anyhow::{bail, Context, Result};
+use symphonia::core::codecs::audio::AudioDecoderOptions;
+use symphonia::core::codecs::CodecParameters;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::{FormatOptions, FormatReader, TrackType};
+use symphonia::core::io::MediaSourceStream;
+use symphonia::core::meta::MetadataOptions;
+
+const TARGET_RATE: u32 = 16_000;
+
+/// Decodes `input` to 16 kHz mono samples, which is what every recogniser here
+/// expects; Parakeet reads them straight out of memory.
+pub fn decode_mono_16k(input: &Path) -> Result<Vec<f32>> {
+    let (samples, rate) = decode_mono(input)?;
+    if samples.is_empty() {
+        bail!("{} decoded to no audio", input.display());
+    }
+    resample(&samples, rate, TARGET_RATE)
+}
+
+/// Decodes `input`, mixes it to mono, resamples to 16 kHz and writes a WAV.
+pub fn write_wav16k_mono(input: &Path, output: &Path) -> Result<()> {
+    write_wav(output, &decode_mono_16k(input)?)
+}
+
+/// `write_wav16k_mono` of at most `seconds` of `input`, from its middle when it is longer.
+pub fn write_wav16k_mono_middle(input: &Path, output: &Path, seconds: f64) -> Result<()> {
+    let samples = decode_mono_16k(input)?;
+    let keep = ((seconds * TARGET_RATE as f64) as usize).min(samples.len());
+    let start = (samples.len() - keep) / 2;
+    write_wav(output, &samples[start..start + keep])
+}
+
+/// Decodes `input` to interleaved 44.1 kHz stereo, which is what the separation
+/// model was trained on. Mono sources are doubled rather than refused: a mono
+/// track still separates, it simply has the same signal in both channels.
+pub fn decode_stereo_44k(input: &Path) -> Result<Vec<f32>> {
+    let (channels, rate) = decode_channels(input)?;
+    if channels.is_empty() || channels[0].is_empty() {
+        bail!("{} decoded to no audio", input.display());
+    }
+    let left = resample(&channels[0], rate, 44_100)?;
+    let right = match channels.get(1) {
+        Some(samples) => resample(samples, rate, 44_100)?,
+        None => left.clone(),
+    };
+    let frames = left.len().min(right.len());
+    let mut interleaved = Vec::with_capacity(frames * 2);
+    for frame in 0..frames {
+        interleaved.push(left[frame]);
+        interleaved.push(right[frame]);
+    }
+    Ok(interleaved)
+}
+
+/// Decodes `input` to stereo at its own sample rate, for processing that must
+/// not resample: a mono source is doubled.
+pub fn decode_stereo(input: &Path) -> Result<audio_post::Stereo> {
+    let (mut channels, rate) = decode_channels(input)?;
+    if channels.is_empty() || channels[0].is_empty() {
+        bail!("{} decoded to no audio", input.display());
+    }
+    let left = channels.remove(0);
+    let right = if channels.is_empty() { left.clone() } else { channels.remove(0) };
+    Ok(audio_post::Stereo::new(left, right, rate))
+}
+
+pub fn write_wav24(path: &Path, audio: &audio_post::Stereo) -> Result<()> {
+    std::fs::write(path, wav24_bytes(audio)?).with_context(|| format!("write {}", path.display()))
+}
+
+/// Stereo as a 24-bit PCM WAV in memory, samples past full scale clipped there.
+pub fn wav24_bytes(audio: &audio_post::Stereo) -> Result<Vec<u8>> {
+    const FULL: f32 = 8_388_607.0;
+    let spec = hound::WavSpec { channels: 2, sample_rate: audio.rate, bits_per_sample: 24, sample_format: hound::SampleFormat::Int };
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    let mut out = hound::WavWriter::new(&mut bytes, spec)?;
+    for frame in 0..audio.frames() {
+        for sample in [audio.left[frame], audio.right[frame]] {
+            out.write_sample((sample.clamp(-1.0, 1.0) * FULL).round() as i32)?;
+        }
+    }
+    out.finalize().context("finish writing the WAV")?;
+    Ok(bytes.into_inner())
+}
+
+/// Writes stereo as 32-bit IEEE float WAV, at its own rate and unclipped.
+pub fn write_wav_f32(path: &Path, audio: &audio_post::Stereo) -> Result<()> {
+    let spec = hound::WavSpec { channels: 2, sample_rate: audio.rate, bits_per_sample: 32, sample_format: hound::SampleFormat::Float };
+    let mut out = hound::WavWriter::create(path, spec).with_context(|| format!("create {}", path.display()))?;
+    for frame in 0..audio.frames() {
+        out.write_sample(audio.left[frame])?;
+        out.write_sample(audio.right[frame])?;
+    }
+    out.finalize().context("finish writing the WAV")?;
+    Ok(())
+}
+
+
+/// Decodes `input` at 44.1 kHz in its own channels, one plane each: a mono recording stays mono.
+pub fn decode_44k(input: &Path) -> Result<Vec<Vec<f32>>> {
+    let (channels, rate) = decode_channels(input)?;
+    if channels.is_empty() || channels[0].is_empty() {
+        bail!("{} decoded to no audio", input.display());
+    }
+    channels.iter().map(|plane| resample(plane, rate, 44_100)).collect()
+}
+
+/// Writes `planes` as one interleaved 32-bit IEEE float WAV at `rate`, unclipped, as long as the shortest plane.
+pub fn write_wav_planes_f32(path: &Path, rate: u32, planes: &[Vec<f32>]) -> Result<()> {
+    let channels = u16::try_from(planes.len()).context("too many channels")?;
+    let frames = planes.iter().map(Vec::len).min().unwrap_or(0);
+    let spec = hound::WavSpec { channels, sample_rate: rate, bits_per_sample: 32, sample_format: hound::SampleFormat::Float };
+    let mut out = hound::WavWriter::create(path, spec).with_context(|| format!("create {}", path.display()))?;
+    for frame in 0..frames {
+        for plane in planes {
+            out.write_sample(plane[frame])?;
+        }
+    }
+    out.finalize().context("finish writing the WAV")?;
+    Ok(())
+}
+
+/// Writes interleaved `samples` of `channels` channels as 24-bit PCM WAV at `rate`, samples past full scale clipped
+/// there.
+pub fn write_wav24_interleaved(path: &Path, rate: u32, channels: u16, samples: &[f32]) -> Result<()> {
+    const FULL: f32 = 8_388_607.0;
+    let spec = hound::WavSpec { channels, sample_rate: rate, bits_per_sample: 24, sample_format: hound::SampleFormat::Int };
+    let mut out = hound::WavWriter::create(path, spec).with_context(|| format!("create {}", path.display()))?;
+    for sample in samples {
+        out.write_sample((sample.clamp(-1.0, 1.0) * FULL).round() as i32)?;
+    }
+    out.finalize().context("finish writing the WAV")?;
+    Ok(())
+}
+
+/// Stereo as a 32-bit IEEE float WAV in memory, at its own rate and unclipped.
+pub fn wav_f32_bytes(audio: &audio_post::Stereo) -> Result<Vec<u8>> {
+    let spec = hound::WavSpec { channels: 2, sample_rate: audio.rate, bits_per_sample: 32, sample_format: hound::SampleFormat::Float };
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    let mut out = hound::WavWriter::new(&mut bytes, spec)?;
+    for frame in 0..audio.frames() {
+        out.write_sample(audio.left[frame])?;
+        out.write_sample(audio.right[frame])?;
+    }
+    out.finalize().context("finish writing the WAV")?;
+    Ok(bytes.into_inner())
+}
+
+/// Every channel kept apart, at the file's own sample rate.
+/// What a file's own tags say about it; empty where they say nothing.
+#[derive(Debug, Clone, Default)]
+pub struct FileTags {
+    pub title: String,
+    pub artist: String,
+    /// Unsynchronised lyrics: ID3 USLT, Vorbis LYRICS.
+    pub lyrics: String,
+}
+
+pub fn tags(path: &Path) -> FileTags {
+    use symphonia::core::meta::StandardTag;
+    let Ok(mut format) = open_format(path) else { return FileTags::default() };
+    let mut found = FileTags::default();
+    // Tags read ahead of the container (an ID3 block before MP3 frames) are
+    // queued on the reader with the container's own; every revision is read.
+    let mut metadata = format.metadata();
+    loop {
+        if let Some(revision) = metadata.current() {
+            for tag in &revision.media.tags {
+                // an ID3 frame marked ISO-8859-1 often holds the system code page
+                let trimmed = |value: &str| crate::legacy_text::repair_latin1(value.trim());
+                match &tag.std {
+                    Some(StandardTag::TrackTitle(value)) if found.title.is_empty() => found.title = trimmed(value),
+                    Some(StandardTag::Artist(value)) if found.artist.is_empty() => found.artist = trimmed(value),
+                    Some(StandardTag::AlbumArtist(value)) if found.artist.is_empty() => found.artist = trimmed(value),
+                    Some(StandardTag::Lyrics(value)) if found.lyrics.is_empty() => found.lyrics = trimmed(value),
+                    _ => {}
+                }
+            }
+        }
+        if metadata.is_latest() {
+            break;
+        }
+        metadata.pop();
+    }
+    found
+}
+
+fn open_format(path: &Path) -> Result<Box<dyn FormatReader>> {
+    let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
+    probe(Box::new(file), path.extension().and_then(|value| value.to_str()))
+}
+
+fn probe(source: Box<dyn symphonia::core::io::MediaSource>, extension: Option<&str>) -> Result<Box<dyn FormatReader>> {
+    let mut hint = Hint::new();
+    if let Some(extension) = extension {
+        hint.with_extension(extension);
+    }
+    symphonia::default::get_probe()
+        .probe(&hint, MediaSourceStream::new(source, Default::default()), FormatOptions::default(), MetadataOptions::default())
+        .context("recognise the audio format")
+}
+
+/// A file's length from its header, without decoding it.
+pub fn duration_seconds(path: &Path) -> Option<f64> {
+    let format = open_format(path).ok()?;
+    let track = format.default_track(TrackType::Audio)?;
+    let Some(CodecParameters::Audio(params)) = &track.codec_params else { return None };
+    Some(track.num_frames? as f64 / params.sample_rate? as f64)
+}
+
+fn decode_channels(path: &Path) -> Result<(Vec<Vec<f32>>, u32)> {
+    let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let extension = path.extension().and_then(|value| value.to_str());
+    decode_source(Box::new(file), extension).with_context(|| format!("decode {}", path.display()))
+}
+
+/// Every file extension the decoder reads: what the window, the uploads, the
+/// imports and the agent's tools take as audio. Opus is not read.
+pub const AUDIO_EXTENSIONS: [&str; 15] = ["mp3", "mp2", "mp1", "wav", "flac", "ogg", "oga", "m4a", "mp4", "aac", "aiff", "aif", "aifc", "caf", "mka"];
+
+/// Whether `extension` (without its dot, any case) names audio the decoder reads.
+pub fn reads_audio(extension: &str) -> bool {
+    AUDIO_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
+}
+
+/// Whether the window's player plays this file as it is: MP3, FLAC, Ogg, AAC
+/// (an MP4 or M4A only when its audio is AAC, not ALAC) and a WAV of plain or
+/// float samples. Anything else the library keeps as FLAC.
+pub fn plays_in_window(extension: &str, audio: &[u8]) -> bool {
+    match extension.to_ascii_lowercase().as_str() {
+        "mp3" | "flac" | "ogg" | "oga" | "aac" => true,
+        "m4a" | "mp4" => {
+            let Ok(format) = probe(Box::new(std::io::Cursor::new(audio.to_vec())), Some(extension)) else {
+                return false;
+            };
+            format.default_track(TrackType::Audio).and_then(|track| track.codec_params.as_ref()).is_some_and(|params| {
+                matches!(params, CodecParameters::Audio(audio) if audio.codec == symphonia::core::codecs::audio::well_known::CODEC_ID_AAC)
+            })
+        }
+        // the fmt chunk's format tag: 1 PCM, 3 float, 0xFFFE extensible
+        "wav" => wav_format_tag(audio).is_some_and(|tag| matches!(tag, 1 | 3 | 0xFFFE)),
+        _ => false,
+    }
+}
+
+/// The format tag of a WAV's `fmt ` chunk, wherever it stands among the chunks (a JUNK, bext or LIST chunk may come
+/// first).
+fn wav_format_tag(audio: &[u8]) -> Option<u16> {
+    if audio.get(0..4)? != b"RIFF" || audio.get(8..12)? != b"WAVE" {
+        return None;
+    }
+    let mut at = 12usize;
+    while let Some(header) = audio.get(at..at + 8) {
+        let size = u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
+        if &header[0..4] == b"fmt " {
+            let tag = audio.get(at + 8..at + 10)?;
+            return Some(u16::from_le_bytes([tag[0], tag[1]]));
+        }
+        at = at.checked_add(8 + size + (size & 1))?;
+    }
+    None
+}
+
+/// Decodes audio held in memory - a track as the engine sent it - to stereo
+/// at its own rate; a mono source is doubled.
+pub fn decode_stereo_bytes(bytes: Vec<u8>, extension: &str) -> Result<audio_post::Stereo> {
+    let (mut channels, rate) = decode_source(Box::new(std::io::Cursor::new(bytes)), Some(extension))?;
+    if channels.is_empty() || channels[0].is_empty() {
+        bail!("the engine's audio decoded to nothing");
+    }
+    let left = channels.remove(0);
+    let right = if channels.is_empty() { left.clone() } else { channels.remove(0) };
+    Ok(audio_post::Stereo::new(left, right, rate))
+}
+
+/// What is wrong with a track the engine sent, if anything: samples that are
+/// not numbers, silence, or one level held from start to end.
+pub fn output_problem(bytes: std::sync::Arc<Vec<u8>>, extension: &str) -> Result<Option<&'static str>> {
+    struct Shared(std::sync::Arc<Vec<u8>>);
+    impl AsRef<[u8]> for Shared {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+    let (mut numbers, mut low, mut high) = (true, f32::INFINITY, f32::NEG_INFINITY);
+    decode_packets(Box::new(std::io::Cursor::new(Shared(bytes))), Some(extension), |packet| {
+        for sample in packet.iter().flatten() {
+            if sample.is_finite() {
+                low = low.min(*sample);
+                high = high.max(*sample);
+            } else {
+                numbers = false;
+            }
+        }
+    })?;
+    Ok(verdict(numbers, low, high))
+}
+
+/// The same judgement on a track already decoded.
+pub fn stereo_problem(audio: &audio_post::Stereo) -> Option<&'static str> {
+    let (mut numbers, mut low, mut high) = (true, f32::INFINITY, f32::NEG_INFINITY);
+    for sample in audio.left.iter().chain(&audio.right) {
+        if sample.is_finite() {
+            low = low.min(*sample);
+            high = high.max(*sample);
+        } else {
+            numbers = false;
+        }
+    }
+    verdict(numbers, low, high)
+}
+
+fn verdict(numbers: bool, low: f32, high: f32) -> Option<&'static str> {
+    if !numbers {
+        Some("samples that are not numbers")
+    } else if low > high || low.abs().max(high.abs()) < 1e-5 {
+        Some("silence")
+    } else if high - low < 1e-6 {
+        Some("one level held from start to end")
+    } else {
+        None
+    }
+}
+
+fn decode_source(source: Box<dyn symphonia::core::io::MediaSource>, extension: Option<&str>) -> Result<(Vec<Vec<f32>>, u32)> {
+    let mut planes: Vec<Vec<f32>> = Vec::new();
+    let rate = decode_packets(source, extension, |packet| {
+        if planes.len() < packet.len() {
+            planes.resize(packet.len(), Vec::new());
+        }
+        for (plane, samples) in planes.iter_mut().zip(packet) {
+            plane.extend_from_slice(samples);
+        }
+    })?;
+    Ok((planes, rate))
+}
+
+/// Decodes the default audio track packet by packet, handing each packet's
+/// channels to `each`; returns the sample rate.
+fn decode_packets(source: Box<dyn symphonia::core::io::MediaSource>, extension: Option<&str>, mut each: impl FnMut(&[Vec<f32>])) -> Result<u32> {
+    let mut format = probe(source, extension)?;
+    let track = format.default_track(TrackType::Audio).context("the file carries no decodable audio track")?;
+    let track_id = track.id;
+    let Some(CodecParameters::Audio(params)) = &track.codec_params else {
+        bail!("the file carries no decodable audio track");
+    };
+    let mut rate = params.sample_rate.unwrap_or(44_100);
+    let mut decoder = symphonia::default::get_codecs()
+        .make_audio_decoder(params, &AudioDecoderOptions::default())
+        .context("no decoder for this audio")?;
+
+    let mut packet_planes: Vec<Vec<f32>> = Vec::new();
+    loop {
+        let packet = match format.next_packet() {
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            // a file cut short still gives what it has
+            Err(symphonia::core::errors::Error::IoError(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(error) => return Err(error).context("read audio packet"),
+        };
+        if packet.track_id != track_id {
+            continue;
+        }
+        let decoded = match decoder.decode(&packet) {
+            Ok(decoded) => decoded,
+            Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
+            Err(error) => return Err(error).context("decode audio packet"),
+        };
+        rate = decoded.spec().rate();
+        decoded.copy_to_vecs_planar(&mut packet_planes);
+        each(&packet_planes);
+    }
+
+    Ok(rate)
+}
+
+/// Every channel averaged into one, at the file's own sample rate.
+fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32)> {
+    let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let mut mono = Vec::new();
+    let rate = decode_packets(Box::new(file), path.extension().and_then(|value| value.to_str()), |packet| {
+        let Some(first) = packet.first() else { return };
+        let count = packet.len() as f32;
+        mono.extend((0..first.len()).map(|index| packet.iter().map(|plane| plane[index]).sum::<f32>() / count));
+    })
+    .with_context(|| format!("decode {}", path.display()))?;
+    Ok((mono, rate))
+}
+
+/// Linear resampling. The recogniser mel-filters everything down to 80 bands
+/// anyway, so a sharper filter would buy nothing here.
+/// Band-limited: interpolating between samples folded everything above the
+/// new Nyquist back into the band as noise, which recognisers heard as
+/// distortion - MuScriptor transcribed a clean vocal as guitar and drums.
+fn resample(samples: &[f32], from: u32, to: u32) -> Result<Vec<f32>> {
+    if from == to || samples.len() < 2 {
+        return Ok(samples.to_vec());
+    }
+    audio_post::resample::mono(samples, from, to)
+}
+
+fn write_wav(path: &Path, samples: &[f32]) -> Result<()> {
+    let spec = hound::WavSpec { channels: 1, sample_rate: TARGET_RATE, bits_per_sample: 16, sample_format: hound::SampleFormat::Int };
+    let mut out = hound::WavWriter::create(path, spec).with_context(|| format!("create {}", path.display()))?;
+    for sample in samples {
+        out.write_sample((sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)?;
+    }
+    out.finalize().context("finish writing the decoded WAV")?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_flac_song_becomes_the_16k_mono_wav_the_captioner_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let tone: Vec<f32> = (0..48_000).map(|i| 0.5 * (i as f32 * 2.0 * std::f32::consts::PI * 440.0 / 48_000.0).sin()).collect();
+        let song = dir.path().join("song.flac");
+        std::fs::write(&song, audio_post::encode::flac(&audio_post::Stereo { left: tone.clone(), right: tone, rate: 48_000 }).unwrap()).unwrap();
+        let wav = dir.path().join("song.wav");
+        write_wav16k_mono(&song, &wav).unwrap();
+        let reader = hound::WavReader::open(&wav).unwrap();
+        let spec = reader.spec();
+        assert_eq!((spec.channels, spec.sample_rate), (1, 16_000));
+        assert!((reader.len() as i64 - 16_000).abs() < 64, "{} samples for one second", reader.len());
+    }
+
+    #[test]
+    fn a_signal_above_full_scale_is_lowered_into_flac_not_cut() {
+        let n = 4_800;
+        let left: Vec<f32> = (0..n).map(|i| 1.5 * (i as f32 * 0.05).sin()).collect();
+        let audio = audio_post::Stereo { left: left.clone(), right: left.clone(), rate: 48_000 };
+        let decoded = decode_stereo_bytes(audio_post::encode::flac(&audio).unwrap(), "flac").unwrap();
+        let peak = decoded.left.iter().fold(0.0f32, |peak, sample| peak.max(sample.abs()));
+        assert!(peak <= 1.0 && peak > 0.999, "{peak}");
+        for (original, back) in left.iter().zip(&decoded.left) {
+            assert!((original / 1.5 - back).abs() < 2.0 / 8_388_607.0, "{original} {back}");
+        }
+    }
+
+    #[test]
+    fn a_flac_decodes_to_the_samples_it_was_made_from() {
+        let n = 24_000;
+        let left: Vec<f32> = (0..n).map(|i| 0.5 * (i as f32 * 0.031).sin()).collect();
+        let right: Vec<f32> = (0..n).map(|i| 0.25 * (i as f32 * 0.017).cos()).collect();
+        let audio = audio_post::Stereo { left: left.clone(), right: right.clone(), rate: 48_000 };
+        let encoded = audio_post::encode::flac(&audio).unwrap();
+        assert_eq!(&encoded[..4], b"fLaC");
+        assert!((crate::library::audio_duration_seconds(&encoded, "flac", None).unwrap() - 0.5).abs() < 1e-9);
+        let decoded = decode_stereo_bytes(encoded, "flac").unwrap();
+        assert_eq!(decoded.rate, 48_000);
+        assert_eq!(decoded.left.len(), n);
+        for (original, back) in left.iter().chain(&right).zip(decoded.left.iter().chain(&decoded.right)) {
+            assert!((original - back).abs() < 2.0 / 8_388_607.0, "{original} {back}");
+        }
+    }
+
+    #[test]
+    fn resampling_keeps_the_band_and_drops_what_lies_above_it() {
+        let tone = |hz: f32| -> Vec<f32> { (0..44_100).map(|index| (2.0 * std::f32::consts::PI * hz * index as f32 / 44_100.0).sin() * 0.5).collect() };
+        let rms = |samples: &[f32]| (samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32).sqrt();
+        let kept = resample(&tone(1_000.0), 44_100, 16_000).unwrap();
+        assert!((kept.len() as i64 - 16_000).abs() <= 1, "{}", kept.len());
+        assert!((rms(&kept[1000..15000]) - 0.3535).abs() < 0.02, "a tone in the band keeps its level: {}", rms(&kept));
+        // 12 kHz is above 16 kHz's Nyquist: it must not fold back to 4 kHz
+        let folded = resample(&tone(12_000.0), 44_100, 16_000).unwrap();
+        assert!(rms(&folded[1000..15000]) < 0.01, "a tone above the band is filtered out: {}", rms(&folded));
+    }
+
+
+    #[test]
+    fn the_restorer_gets_44k_in_the_channels_of_the_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let mono = dir.path().join("mono.wav");
+        let spec = hound::WavSpec { channels: 1, sample_rate: 22_050, bits_per_sample: 16, sample_format: hound::SampleFormat::Int };
+        let mut writer = hound::WavWriter::create(&mono, spec).unwrap();
+        for i in 0..22_050 {
+            writer.write_sample(((i as f32 * 0.05).sin() * 8_000.0) as i16).unwrap();
+        }
+        writer.finalize().unwrap();
+        let planes = decode_44k(&mono).unwrap();
+        assert_eq!(planes.len(), 1, "a mono source stays mono");
+        assert!((planes[0].len() as i64 - 44_100).abs() < 64, "one second at 44.1 kHz: {}", planes[0].len());
+
+        let wav = dir.path().join("in.wav");
+        write_wav_planes_f32(&wav, 44_100, &[vec![0.5, 1.5], vec![-0.5, -1.5]]).unwrap();
+        let reader = hound::WavReader::open(&wav).unwrap();
+        assert_eq!((reader.spec().channels, reader.spec().sample_rate, reader.spec().bits_per_sample), (2, 44_100, 32));
+        let samples: Vec<f32> = reader.into_samples::<f32>().map(Result::unwrap).collect();
+        assert_eq!(samples, vec![0.5, -0.5, 1.5, -1.5], "interleaved and unclipped");
+
+        let out = dir.path().join("out.wav");
+        write_wav24_interleaved(&out, 44_100, 1, &[0.5, 2.0]).unwrap();
+        let reader = hound::WavReader::open(&out).unwrap();
+        assert_eq!((reader.spec().channels, reader.spec().bits_per_sample), (1, 24));
+        let samples: Vec<i32> = reader.into_samples::<i32>().map(Result::unwrap).collect();
+        assert_eq!(samples[1], 8_388_607, "past full scale is clipped there");
+    }
+
+    #[test]
+    fn the_window_offers_every_extension_the_decoder_reads() {
+        let window = include_str!("../../../app/services/audioFiles.ts");
+        let listed = window.split_once("AUDIO_EXTENSIONS = [").and_then(|(_, rest)| rest.split_once(']')).map(|(list, _)| list).unwrap();
+        let listed: Vec<&str> = listed.split(',').map(|item| item.trim().trim_matches('\'')).filter(|item| !item.is_empty()).collect();
+        assert_eq!(listed, AUDIO_EXTENSIONS);
+        assert!(reads_audio("MKA") && reads_audio("caf") && !reads_audio("opus") && !reads_audio("txt"));
+    }
+
+    #[test]
+    fn only_what_the_player_plays_is_kept_as_it_is() {
+        let chunk = |id: &[u8; 4], body: &[u8]| [id.as_slice(), &(body.len() as u32).to_le_bytes(), body, &vec![0u8; body.len() & 1]].concat();
+        let wav_with = |before: &[u8], tag: u16| {
+            let mut fmt = vec![0u8; 16];
+            fmt[0..2].copy_from_slice(&tag.to_le_bytes());
+            let body = [b"WAVE".as_slice(), before, &chunk(b"fmt ", &fmt), &chunk(b"data", &[0u8; 4])].concat();
+            chunk(b"RIFF", &body)
+        };
+        let wav = |tag: u16| wav_with(&[], tag);
+        assert!(plays_in_window("wav", &wav(1)) && plays_in_window("WAV", &wav(3)) && plays_in_window("wav", &wav(0xFFFE)));
+        assert!(!plays_in_window("wav", &wav(2)), "ADPCM");
+        assert!(plays_in_window("wav", &wav_with(&chunk(b"JUNK", &[0u8; 27]), 3)), "a chunk before fmt, of odd size");
+        assert!(!plays_in_window("wav", &[0u8; 44]), "not a RIFF WAVE");
+        assert!(plays_in_window("mp3", &[]) && plays_in_window("aac", &[]));
+        assert!(!plays_in_window("m4a", &[]), "an M4A whose codec is not read as AAC is converted");
+        assert!(!plays_in_window("mka", &[]) && !plays_in_window("caf", &[]) && !plays_in_window("aiff", &[]));
+    }
+
+    #[test]
+    fn a_broken_engine_track_is_named() {
+        let check = |left: Vec<f32>| {
+            let path = std::env::temp_dir().join(format!("probe-{}.wav", uuid::Uuid::now_v7()));
+            write_wav_f32(&path, &audio_post::Stereo { right: left.clone(), left, rate: 48_000 }).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            std::fs::remove_file(&path).ok();
+            output_problem(std::sync::Arc::new(bytes), "wav").unwrap()
+        };
+        assert_eq!(check((0..4_800).map(|i| 0.3 * (i as f32 * 0.05).sin()).collect()), None);
+        assert_eq!(check(vec![0.0; 4_800]), Some("silence"));
+        assert_eq!(check(vec![-1.0; 4_800]), Some("one level held from start to end"));
+        let mut broken: Vec<f32> = (0..4_800).map(|i| 0.3 * (i as f32 * 0.05).sin()).collect();
+        broken[100] = f32::NAN;
+        assert_eq!(check(broken.clone()), Some("samples that are not numbers"));
+        assert_eq!(stereo_problem(&audio_post::Stereo { right: broken.clone(), left: broken, rate: 48_000 }), Some("samples that are not numbers"));
+        assert_eq!(stereo_problem(&audio_post::Stereo { right: vec![0.0; 10], left: vec![0.0; 10], rate: 48_000 }), Some("silence"));
+    }
+
+    #[test]
+    fn a_written_wav_carries_a_readable_header() {
+        let path = std::env::temp_dir().join(format!("pcm-{}.wav", uuid::Uuid::now_v7()));
+        write_wav(&path, &[0.0, 0.5, -0.5]).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), 16_000);
+        assert_eq!(bytes.len(), 44 + 6);
+        std::fs::remove_file(&path).ok();
+    }
+}
+
+#[cfg(test)]
+mod live {
+    use super::*;
+
+    /// Decodes an actual generated track, when one is there to decode. The
+    /// karaoke path failed with "whisper-cli produced no LRC file", and the
+    /// only way that happens with a successful exit is a WAV whisper cannot
+    /// read - so this is where that would show.
+    #[test]
+    fn decoding_a_real_track_gives_whisper_something_to_read() {
+        let Some(track) = std::env::var_os("YUE_TEST_TRACK").map(std::path::PathBuf::from) else { return };
+        let output = std::env::temp_dir().join("yue2-decode-check.wav");
+        write_wav16k_mono(&track, &output).expect("decode the track");
+        let size = std::fs::metadata(&output).expect("the wav exists").len();
+        assert!(size > 44, "the wav is nothing but a header: {size} bytes");
+        eprintln!("wav: {} bytes at {}", size, output.display());
+    }
+}
+

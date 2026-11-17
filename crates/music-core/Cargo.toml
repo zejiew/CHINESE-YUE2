@@ -1,0 +1,18 @@
+[package]
+name = "music-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+# `prctl`/`getppid` for PR_SET_PDEATHSIG, the POSIX stand-in for the Windows
+# job object that keeps children from outliving the studio.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

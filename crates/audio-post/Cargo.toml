@@ -1,0 +1,19 @@
+[package]
+name = "audio-post"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+audioadapter = "5.0"
+audioadapter-buffers = "5.2"
+flac-bound = { version = "0.5.0", default-features = false, features = ["libflac-noogg"] }
+mp3lame-encoder = "0.3.0"
+realfft = "3.5"
+rubato = "5.0"
+serde.workspace = true
+
+[dev-dependencies]
+hound = "3.5"
+serde_json.workspace = true

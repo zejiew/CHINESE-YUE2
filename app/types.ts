@@ -1,0 +1,278 @@
+export interface Song {
+  /** A track a tool made from another: which one, by which tool, how. */
+  derived?: { from: string; fromTitle: string; tool: string; settings?: Record<string, unknown> } | null;
+  id: string;
+  title: string;
+  lyrics: string;
+  style: string;
+  coverUrl: string;
+  /** The page a cover photograph came from and the terms it is under. */
+  coverSource?: string;
+  /** Set while the cover is the look's placeholder, not one of the track's own. */
+  coverPlaceholder?: string;
+  duration: string;
+  createdAt: Date;
+  isGenerating?: boolean;
+  /** Why a generation ended without a song; the card stays until it is removed. */
+  failure?: string;
+  /** A failed song's reason code (`i18n/songErrors.ts`), for the action its card offers. */
+  failureCode?: string;
+  /** The engine job a generation's row follows. */
+  jobId?: string;
+  /** The playlist the song being made goes into. */
+  playlistId?: string;
+  /** The job that made a library song; its row becomes this song. */
+  madeByJob?: string;
+  /** The list row this item is drawn in, when it took over another item's row. */
+  viewKey?: string;
+  queuePosition?: number; // Position in queue (undefined = actively generating, number = waiting in queue)
+  progress?: number;
+  stage?: string;
+  /** The running stage's counter, e.g. `57/64 · ~2:50`. */
+  stageDetail?: string;
+  /** The card's memory is full and the driver lends the engine the computer's memory: the song crawls. */
+  memoryShort?: boolean;
+  generationParams?: any;
+  tags: string[];
+  audioUrl?: string;
+  /** The thumbs-up, kept with the song in the library. */
+  liked?: boolean;
+  /** The person's own note on the song, kept in the library. */
+  note?: string;
+  /** When it was liked: the liked list is read from the latest. */
+  likedAt?: Date;
+  isPublic?: boolean;
+  likeCount?: number;
+  viewCount?: number;
+  userId?: string;
+  creator?: string;
+  creator_avatar?: string;
+  ditModel?: string;
+  lmModel?: string;
+  lmBackend?: string;
+  openrouterModel?: string | null;
+  generationTime?: number;
+  lrcContent?: string;
+  bpm?: number;
+  keyScale?: string;
+  timeSignature?: string;
+  /** The track carries its semantic stream, so POST /v1/music/replay can re-render it. */
+  nativeReplayAvailable?: boolean;
+  /** The engine stopped the song before its end: at its length limit, or where the model's memory ran out. */
+  cutShort?: 'length' | 'memory';
+  /** Its request asked for this many tracks and fewer fit the card's memory. */
+  tracksAsked?: number;
+  /** Processed versions kept beside the original; the active one plays. */
+  audioVersions?: SongVersion[];
+  /** `original`, a version id, or absent for a track never processed. */
+  activeVersion?: string;
+}
+
+export interface SongVersion {
+  id: string;
+  label: string;
+  createdAt: string;
+  settings?: Record<string, unknown>;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  description?: string;
+  coverUrl?: string;
+  cover_url?: string;
+  songIds?: string[];
+  isPublic?: boolean;
+  is_public?: boolean;
+  user_id?: string;
+  creator?: string;
+  created_at?: string;
+  song_count?: number;
+  songs?: any[];
+}
+
+export interface Comment {
+  id: string;
+  songId: string;
+  userId: string;
+  username: string;
+  content: string;
+  createdAt: Date;
+}
+
+/** One autoregressive stage's sampling preset; an absent knob is the checkpoint value. */
+export interface YueSampling {
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  repetition_penalty?: number;
+  penalty_window?: number;
+  min_tokens?: number;
+  max_tokens?: number;
+}
+
+/** Chord variety and section order of the score the model plans; every control is off at zero. */
+export interface YueHarmony {
+  identity?: 'root' | 'spelling';
+  strength?: number;
+  window?: number;
+  hold_limit?: number;
+  outside_bonus?: number;
+  outside_limit?: number;
+  section_strength?: number;
+  section_open?: number;
+  /** Hold the plan to the lyrics' sections, in order. */
+  follow_lyrics?: boolean;
+}
+
+export type YueCot = 'full' | 'melody' | 'off';
+export type YueOutputFormat = 'flac' | 'mp3' | 'wav32';
+
+/**
+ * A YuE2 request as `/v1/music/jobs` accepts it. Field names are the engine's
+ * own (`Yue2Request` in yue2.cpp); anything left out is the engine default.
+ */
+export interface YueRequest {
+  /** Style tags or a short style prompt, verbatim under `[Tags]`. */
+  style: string;
+  /** Lyrics with section tags, verbatim under `[Lyrics]`. */
+  lyrics: string;
+  /** ABC score to realise; empty lets the model write one. */
+  abc?: string;
+  /** Move a supplied score before singing, in semitones. */
+  transpose?: number;
+  /** With a supplied score, each section's words wait until the score reaches it; on unless false. */
+  lyric_timing?: boolean;
+  vocals_only?: boolean;
+  /** Seconds the studio fades the made song in and out over. */
+  fade_in?: number;
+  fade_out?: number;
+  cot?: YueCot;
+  /** Target length; the model may end the song earlier. */
+  duration_seconds?: number;
+  /** Seed of the token draw: score, melody and length. */
+  lm_seed?: number;
+  /** Seed of the acoustic noise. */
+  seed?: number;
+  steps?: number;
+  lm_batch_size?: number;
+  synth_batch_size?: number;
+  cfg_scale?: number;
+  /** Strength of the realaudio decoder companion; 0 decodes with the checkpoint alone. */
+  companion_scale?: number;
+  semantic_tokens?: string;
+  abc_sampling?: YueSampling;
+  semantic_sampling?: YueSampling;
+  harmony?: YueHarmony;
+  /** The acoustic ODE solver: midpoint is the reference, ab2 about twice as fast. */
+  solver?: 'midpoint' | 'ab2';
+  /** abc is only the opening: the model writes the rest of the song on from it. */
+  abc_continue?: boolean;
+  output_format?: YueOutputFormat;
+  mp3_bitrate?: number;
+  /** Library title only, never sent to the engine. */
+  title?: string;
+  /** The library song whose melody this cover sings; the new song names it. */
+  cover_of?: string;
+  cover_prompt?: string;
+  /** LoRA adapters for this song, each with a strength per engine slot. */
+  adapters?: { id: string; scales: Record<string, number> }[];
+  /** The playlist the made songs are added to: a project being worked on. */
+  playlist_id?: string;
+}
+
+/** A song as the library stores and lists it. */
+export interface NativeLibrarySong {
+  id: string;
+  title: string;
+  audio_path?: string | null;
+  caption: string;
+  lyrics: string;
+  metadata?: Record<string, unknown> | null;
+  generation_settings?: Record<string, unknown> | null;
+  engine_id: string;
+  profile_id?: string | null;
+  replay_request?: unknown | null;
+  audio_codes?: unknown | null;
+  /** The library's list leaves the replay request and the semantic stream out and says only whether both are kept. */
+  replay_available?: boolean;
+  /** The engine stopped the song before its end: at its length limit, or where the model's memory ran out. */
+  cut_short?: 'length' | 'memory';
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface YueJobSong {
+  id: string;
+  audio_url: string;
+  /** The library's record of the song, as the library lists it. */
+  song: NativeLibrarySong;
+}
+
+export interface YueJob {
+  id: string;
+  /** The mark this window gave the request; an agent's job has none. */
+  client_ref?: string;
+  /** When the service took the request, in Unix milliseconds. */
+  submitted_at: number;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  phase: string;
+  message: string;
+  /** For a failed job, why as a code and fields the window translates (i18n/songErrors.ts). */
+  code?: string;
+  params?: Record<string, unknown>;
+  title?: string;
+  style: string;
+  lyrics: string;
+  duration_seconds: number;
+  generation_settings: Record<string, unknown>;
+  playlist_id?: string;
+  song?: YueJobSong;
+  songs?: YueJobSong[];
+  /** How the lyrics were laid along a score that came without sections. */
+  laid?: { seconds: number; ceiling: number; crowded: { ratio: number; notes: number; syllables: number } | null };
+  /** The card's memory ran out and the driver lent the engine the computer's memory. */
+  card_memory_short?: boolean;
+  /** The tracks asked for when fewer fit the card; `lm_batch_size` of the settings is what is made. */
+  tracks_asked?: number;
+}
+
+/** What the engine log says the running job is doing. */
+export interface YueProgress {
+  stage: 'score' | 'semantic' | 'acoustic' | 'decode' | 'transcribe';
+  fraction: number;
+  detail: string;
+}
+
+
+export interface PlayerState {
+  currentSong: Song | null;
+  isPlaying: boolean;
+  progress: number;
+  volume: number;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  createdAt: Date;
+  followerCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+  isAdmin?: boolean;
+  avatar_url?: string;
+  banner_url?: string;
+}
+
+export interface UserProfile {
+  user: User;
+  publicSongs: Song[];
+  publicPlaylists: Playlist[];
+  stats: {
+    totalSongs: number;
+    totalLikes: number;
+  };
+}
+
+// Simplified views for ACE-Step UI
+export type View = 'create' | 'library' | 'tools' | 'adapters' | 'playlist' | 'search' | 'news';

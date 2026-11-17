@@ -1,0 +1,605 @@
+[
+  {
+    "id": "yue2-studio-4-0-0",
+    "date": "2026-11-13",
+    "title": {
+      "en": "YuE2 Studio 4.0.0",
+      "ru": "YuE2 Studio 4.0.0",
+      "zh": "YuE2 Studio 4.0.0",
+      "ja": "YuE2 Studio 4.0.0",
+      "ko": "YuE2 Studio 4.0.0"
+    },
+    "body": {
+      "en": "Long songs are back on every card, no song comes out silent, and a lot of what you asked for is in: a bin, your own subtitles, your own rules for the assistant, your own and community YuE2 models.\n\n- **A song is no longer refused for its length:** when its style, lyrics and score leave too little room, it is made as long as fits and marked where it stopped. The flat limit on cards of 8 GB and less and on RTX 50 is gone. **Flash attention is on again on RTX 50 cards** under Auto, as in 3.8.3; On and Off are in Settings, which also say which KV cache the engine runs with and why.\n- **No silent songs:** when the card computes something that is not sound, the engine computes it again, and a song it cannot save says so with a Make again button.\n- **KV cache: Auto, F16 or Q8** (NVIDIA cards): Auto keeps F16 while it fits the card and takes Q8, half the memory, when it does not.\n- **Keep models loaded: Auto:** where the card has room the models stay between songs, and go before stems, MIDI, karaoke and after ten idle minutes.\n- **Your own YuE2 model:** a fine-tune in GGUF sings in place of the set's model, and the same list has Ruach Studio's community merges, downloaded when chosen.\n- **Linux with an NVIDIA card computes on CUDA 13 or 12** instead of Vulkan.\n- **A long song keeps its level** where one chunk of its sound meets the next, and **a song over a chord bed is sung to a melody** the model writes over your chords.\n- **Karaoke:** it hears with CrisperWhisper, your own .srt, .lrc, .ass or .ssa becomes a song's karaoke, its lines can be edited, and the offset in a video reaches 30 seconds.\n- **A bin** for deleted songs, **your own rules** for the writing assistant, **lyrics heard from a recording** on this computer, **Split and Join notes** in the MIDI editor, notes drawn while Audio to MIDI hears them, a stopped download that can be continued or deleted, four more LoRA in the catalog.\n- **Restore after compression:** Apollo removes the artefacts of MP3 compression from a song or any audio file and puts the restored track beside it in the library.\n- **Report a problem without a GitHub account:** the window sends a bug, an idea or a question through Studio Hub, shows exactly what goes, and gives the link to the issue it opened.\n- **Fixed:** RTX 50 cards running out of memory on long songs, Stems and Audio to MIDI at the same time, an instrumental that kept its old score, lyrics lost after Reuse prompt, Describe by ear ignoring the processor, a Terminal tab left open beside the studio, a download through a proxy that fails without naming the proxy. On the processor a song's sound is computed about 1.2 times faster.\n\nThe whole list is in What's new.",
+      "ru": "Длинные песни снова получаются на любой карте, песня больше не выходит тишиной, и сделано многое из того, о чём вы просили: корзина, свои субтитры, свои правила для ассистента, своя модель YuE2 и модели сообщества.\n\n- **Песне больше не отказывают из-за длины:** если стиль, текст и партитура оставляют мало места, она делается такой длины, какая помещается, и помечается там, где остановилась. Жёсткого предела на картах до 8 ГБ и на RTX 50 больше нет. **На RTX 50 Flash Attention снова включён** в режиме «Авто», как в 3.8.3; «Включено» и «Выключено» — в настройках, там же видно, с каким KV-кэшем работает движок и почему.\n- **Никаких песен-тишины:** если карта посчитала не звук, движок считает заново, а песня, которую не спасти, говорит об этом и предлагает «Повторить».\n- **KV-кэш: «Авто», F16 или Q8** (карты NVIDIA): «Авто» держит F16, пока он помещается в карту, и берёт Q8, вдвое меньше памяти, когда не помещается.\n- **«Держать модели загруженными: Авто»:** если на карте есть место, модели остаются между песнями и выгружаются перед стемами, MIDI, караоке и после десяти минут без песен.\n- **Своя модель YuE2:** файнтюн в GGUF поёт вместо модели набора, а в том же списке — слияния Ruach Studio от сообщества, они скачиваются при выборе.\n- **Linux с картой NVIDIA считает через CUDA 13 или 12,** а не через Vulkan.\n- **Длинная песня держит уровень** на стыке кусков звука, а **песня по аккордовой подложке поётся с мелодией,** которую модель пишет поверх ваших аккордов.\n- **Караоке:** слова распознаёт CrisperWhisper, свой .srt, .lrc, .ass или .ssa становится караоке песни, строки можно править, сдвиг в видео — до 30 секунд.\n- **Корзина** для удалённых песен, **свои правила** для ассистента, **текст из записи** на этом компьютере, **«Разрезать» и «Склеить» ноты** в редакторе MIDI, ноты видны, пока «Аудио в MIDI» слушает, остановленную закачку можно продолжить или удалить, четыре новые LoRA в каталоге.\n- **Восстановление после сжатия:** Apollo убирает артефакты сжатия MP3 из песни или любого аудиофайла и кладёт восстановленный трек рядом в медиатеку.\n- **Сообщить о проблеме без аккаунта GitHub:** окно отправляет ошибку, идею или вопрос через Studio Hub, заранее показывает, что именно уйдёт, и даёт ссылку на открытое обращение.\n- **Исправлено:** нехватка памяти на RTX 50 на длинных песнях, стемы и «Аудио в MIDI» одновременно, инструментал со старой партитурой, текст, пропадавший после «Повторить промпт», «Стиль на слух» мимо выбранного процессора, вкладка терминала рядом со студией, закачка через прокси, падавшая без названия прокси. На процессоре звук песни считается примерно в 1,2 раза быстрее.\n\nПолный список — в «Что нового».",
+      "zh": "长歌在任何显卡上都能重新完成，歌曲不再输出静音，并且加入了许多大家提过的需求：回收站、自己的字幕、写作助手的自定义规则、自己的 YuE2 模型和社区模型。\n\n- **歌曲不再因为时长被拒绝：** 风格、歌词和乐谱留下的空间不够时，歌曲按能放下的长度生成，并在停止处标记。8 GB 及以下显卡和 RTX 50 上的固定上限已取消。**RTX 50 上的 Flash Attention 在“自动”下重新开启**，与 3.8.3 相同；“开启”和“关闭”在设置中，那里也会说明引擎使用哪种 KV 缓存以及原因。\n- **不再有静音歌曲：** 显卡算出的不是声音时引擎会重新计算，无法挽救的歌曲会说明原因并提供“重新生成”。\n- **KV 缓存：自动、F16 或 Q8**（NVIDIA 显卡）：“自动”在放得下时保持 F16，放不下时改用占用减半的 Q8。\n- **保持模型加载：自动：** 显卡有空间时，模型在歌曲之间保留，并在分轨、MIDI、卡拉OK 之前以及空闲十分钟后卸载。\n- **自己的 YuE2 模型：** GGUF 格式的微调模型可以代替模型组中的模型演唱，同一列表中还有 Ruach Studio 的社区合并模型，选择时下载。\n- **Linux 上的 NVIDIA 显卡通过 CUDA 13 或 12 计算**，不再使用 Vulkan。\n- **长歌在声音分段的衔接处保持音量**，**按和弦铺底生成的歌曲会唱出旋律**，由模型在你的和弦上写出。\n- **卡拉OK：** 由 CrisperWhisper 识别，自己的 .srt、.lrc、.ass 或 .ssa 可作为歌曲的卡拉OK，行可以编辑，视频中的偏移可达 30 秒。\n- 删除歌曲的**回收站**、写作助手的**自定义规则**、在本机**从录音识别歌词**、MIDI 编辑器中的**拆分和合并音符**、音频转 MIDI 识别时即可看到音符、中断的下载可以继续或删除、目录中新增四个 LoRA。\n- **压缩后修复：**Apollo 去除歌曲或任何音频文件中的 MP3 压缩痕迹，修复后的曲目放在媒体库原曲旁边。\n- **无需 GitHub 账号即可报告问题：**窗口通过 Studio Hub 发送错误、建议或问题，事先显示将发送的全部内容，并给出新建议题的链接。\n- **已修复：** RTX 50 上长歌显存不足、分轨与音频转 MIDI 同时运行、器乐保留旧乐谱、“复用提示”后歌词丢失、“听辨风格”不遵守所选处理器、工作室旁残留的终端标签页、通过代理下载失败却不说明代理。在处理器上，歌曲的声音计算快了约 1.2 倍。\n\n完整列表见“更新内容”。",
+      "ja": "長い曲がどのカードでも再び作れるようになり、無音の曲は出なくなりました。要望の多かった機能も入りました：ごみ箱、自分の字幕、作詞アシスタントの自分のルール、自分の YuE2 モデルとコミュニティのモデル。\n\n- **長さを理由に曲が断られなくなりました：** スタイル、歌詞、譜面で余地が足りないとき、入る長さで作り、止まった所に印を付けます。8 GB 以下のカードと RTX 50 の一律の上限はなくなりました。**RTX 50 で Flash Attention が「自動」で再び有効**になりました（3.8.3 と同じ）。「オン」「オフ」は設定にあり、エンジンがどの KV キャッシュを使っているか、その理由も表示されます。\n- **無音の曲はもうありません：** カードが音でないものを計算したとき、エンジンが計算し直します。救えない曲はそう伝え、「もう一度作る」を出します。\n- **KV キャッシュ：自動、F16、Q8**（NVIDIA カード）：「自動」は収まる間は F16、収まらないときはメモリ半分の Q8 を使います。\n- **モデルを読み込んだままにする：自動：** カードに余裕があればモデルを曲の間も残し、ステム、MIDI、カラオケの前と、曲のない 10 分の後に解放します。\n- **自分の YuE2 モデル：** GGUF のファインチューンがセットのモデルの代わりに歌います。同じ一覧に Ruach Studio のコミュニティのマージがあり、選ぶとダウンロードされます。\n- **Linux の NVIDIA カードは CUDA 13 または 12 で計算**します（Vulkan ではなく）。\n- **長い曲は音のつなぎ目で音量を保ち**、**コード下地の曲は、モデルがコードの上に書いたメロディで歌われます**。\n- **カラオケ：** CrisperWhisper が聞き取り、自分の .srt、.lrc、.ass、.ssa を曲のカラオケにでき、行を編集でき、動画でのずれは 30 秒まで調整できます。\n- 削除した曲の**ごみ箱**、作詞アシスタントの**自分のルール**、このコンピューターで**録音から歌詞を聞き取る**機能、MIDI エディターの**ノートの分割と結合**、オーディオ→MIDI の聞き取り中に見えるノート、止まったダウンロードの再開と削除、カタログに LoRA が 4 つ追加。\n- **圧縮から復元：**Apollo が曲や任意の音声ファイルから MP3 圧縮のアーティファクトを取り除き、復元したトラックをライブラリの元トラックの隣に入れます。\n- **GitHub アカウントなしで問題を報告：**ウィンドウがバグ、アイデア、質問を Studio Hub 経由で送り、送る内容を事前にそのまま表示し、作成された Issue へのリンクを返します。\n- **修正：** RTX 50 での長い曲のメモリ不足、ステムとオーディオ→MIDI の同時実行、古い譜面を残すインスト、「プロンプトを再利用」後に消える歌詞、選んだプロセッサーを無視する「耳でスタイル」、スタジオの横に残るターミナルのタブ、プロキシ名を言わずに失敗するダウンロード。プロセッサーでは曲の音の計算が約 1.2 倍速くなりました。\n\nすべての一覧は「新機能」にあります。",
+      "ko": "긴 곡이 어떤 카드에서도 다시 만들어지고, 무음 곡은 더 이상 나오지 않으며, 요청이 많았던 기능도 들어갔습니다: 휴지통, 내 자막, 작사 어시스턴트의 내 규칙, 내 YuE2 모델과 커뮤니티 모델.\n\n- **길이 때문에 곡이 거절되지 않습니다:** 스타일, 가사, 악보가 남기는 자리가 부족하면 들어가는 길이만큼 만들고 멈춘 곳을 표시합니다. 8 GB 이하 카드와 RTX 50의 고정 상한은 없어졌습니다. **RTX 50에서 Flash Attention이 \"자동\"으로 다시 켜집니다** (3.8.3과 같음). \"켜기\"와 \"끄기\"는 설정에 있고, 엔진이 어떤 KV 캐시를 쓰는지와 그 이유도 보입니다.\n- **무음 곡은 없습니다:** 카드가 소리가 아닌 것을 계산하면 엔진이 다시 계산하고, 살릴 수 없는 곡은 그렇다고 알리며 \"다시 만들기\"를 보여 줍니다.\n- **KV 캐시: 자동, F16, Q8** (NVIDIA 카드): \"자동\"은 들어가는 동안 F16을, 들어가지 않으면 메모리가 절반인 Q8을 씁니다.\n- **모델을 불러 둔 채로 유지: 자동:** 카드에 여유가 있으면 모델을 곡 사이에 두고, 스템, MIDI, 노래방 전과 곡 없이 10분이 지나면 내립니다.\n- **내 YuE2 모델:** GGUF 파인튠이 세트의 모델 대신 부르며, 같은 목록에 Ruach Studio의 커뮤니티 병합 모델이 있어 고르면 내려받습니다.\n- **Linux의 NVIDIA 카드는 CUDA 13 또는 12로 계산합니다** (Vulkan 대신).\n- **긴 곡은 소리 조각의 이음새에서 음량을 유지하고**, **코드 바탕 위의 곡은 모델이 코드 위에 쓴 멜로디로 불립니다**.\n- **노래방:** CrisperWhisper가 듣고, 내 .srt, .lrc, .ass, .ssa가 곡의 노래방이 되며, 줄을 편집할 수 있고, 영상의 오프셋은 30초까지 됩니다.\n- 삭제한 곡의 **휴지통**, 작사 어시스턴트의 **내 규칙**, 이 컴퓨터에서 **녹음으로 가사 듣기**, MIDI 편집기의 **노트 나누기와 합치기**, 오디오→MIDI가 듣는 동안 보이는 노트, 멈춘 다운로드의 이어 받기와 삭제, 카탈로그에 LoRA 4개 추가.\n- **압축 후 복원:** Apollo가 노래나 어떤 오디오 파일에서든 MP3 압축 잡음을 없애고, 복원한 트랙을 라이브러리의 원본 옆에 넣습니다.\n- **GitHub 계정 없이 문제 신고:** 창이 버그, 아이디어, 질문을 Studio Hub로 보내고, 보낼 내용을 미리 그대로 보여 주며, 열린 이슈의 링크를 줍니다.\n- **수정:** RTX 50에서 긴 곡의 메모리 부족, 스템과 오디오→MIDI 동시 실행, 예전 악보를 남기는 연주곡, \"프롬프트 다시 쓰기\" 후 사라지는 가사, 고른 프로세서를 따르지 않는 \"귀로 스타일\", 스튜디오 옆에 남는 터미널 탭, 프록시를 말하지 않고 실패하는 다운로드. 프로세서에서는 곡의 소리 계산이 약 1.2배 빨라졌습니다.\n\n전체 목록은 \"새 기능\"에 있습니다."
+    },
+    "tags": [
+      "YuE2",
+      "4.0.0"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-8-0",
+    "date": "2026-10-27",
+    "title": {
+      "en": "YuE2 Studio 3.8.0",
+      "ru": "YuE2 Studio 3.8.0",
+      "zh": "YuE2 Studio 3.8.0",
+      "ja": "YuE2 Studio 3.8.0",
+      "ko": "YuE2 Studio 3.8.0"
+    },
+    "body": {
+      "en": "Stems and Audio to MIDI on audio.cpp, an update screen that says what changes, and the most frequent failures of 3.7.0 fixed.\n\n- **Variations no longer stop the engine:** \"CUDA error: an illegal memory access\" with Variations at 2 or more is gone.\n- **Stems and Audio to MIDI run on audio.cpp's server,** the one of Speech Studio and Dub Studio: HT-Demucs 6s on CUDA, Vulkan or the processor, MuScriptor about twice as fast.\n- **The update screen:** the first start says what this version updates, adds and no longer needs, with the space it frees; one button does it all.\n- **Every download is checked against its publisher's hash.**\n- **Style by ear fits the card:** a 16 GB card no longer runs out of memory on long songs, a card under 12 GB uses the smaller Q4_K_M build, a smaller one describes on the processor.\n- **Interface scale** 90-150 %, **karaoke as SRT** for video editors, an **Analyzer** spectrum, glosses for the style suggestions in five languages.\n- **Fixed:** the separator downloads (\"unknown asset roformer\"), karaoke on processors without AVX-512, the cover-look freeze, settings that reset at every start, Instrumental only with a voiceless score, a Mac engine that stayed after closing, playback in an extracted Linux AppImage, Radeon cards of 8 GB.\n\nThe whole list is in What's new.",
+      "ru": "Стемы и «Аудио в MIDI» на audio.cpp, экран обновления, который говорит, что меняется, и самые частые сбои 3.7.0 исправлены.\n\n- **Вариации больше не роняют движок:** ошибки «CUDA error: an illegal memory access» при Вариациях 2 и больше нет.\n- **Стемы и «Аудио в MIDI» работают на сервере audio.cpp,** том же, что у Speech Studio и Dub Studio: HT-Demucs 6s на CUDA, Vulkan или процессоре, MuScriptor примерно вдвое быстрее.\n- **Экран обновления:** при первом запуске студия показывает, что эта версия обновит, добавит и уберёт, и сколько места освободится; одна кнопка делает всё.\n- **Каждая закачка сверяется с хешем издателя.**\n- **«Стиль на слух» по силам карте:** карта на 16 ГБ больше не переполняется на длинных песнях, карта меньше 12 ГБ берёт сборку поменьше Q4_K_M, совсем маленькая описывает на процессоре.\n- **Масштаб интерфейса** 90-150 %, **караоке в SRT** для видеоредакторов, спектр **«Анализатор»**, пояснения к подсказкам стиля на пяти языках.\n- **Исправлено:** закачка разделителей («unknown asset roformer»), караоке на процессорах без AVX-512, зависание при смене вида обложек, настройки, сбрасывавшиеся при каждом запуске, «Только инструментал» с партитурой без голоса, движок на Mac, остававшийся после закрытия, воспроизведение в распакованном Linux AppImage, видеокарты Radeon на 8 ГБ.\n\nПолный список — в «Что нового».",
+      "zh": "分轨与「音频转 MIDI」改用 audio.cpp，新增说明变化的更新界面，并修复了 3.7.0 最常见的故障。\n\n- **多版本不再让引擎停止：**变体为 2 及以上时的「CUDA error: an illegal memory access」已消失。\n- **分轨与「音频转 MIDI」在 audio.cpp 服务器上运行，**与 Speech Studio、Dub Studio 相同：HT-Demucs 6s 可用 CUDA、Vulkan 或处理器，MuScriptor 约快一倍。\n- **更新界面：**首次启动时列出本版本更新、新增和不再需要的内容及释放的空间，一个按钮全部完成。\n- **每个下载都按发布者公布的哈希校验。**\n- **「按声音描述风格」适配显卡：**16 GB 显卡处理长歌不再爆显存，低于 12 GB 使用较小的 Q4_K_M 版本，更小的显卡改用处理器。\n- **界面缩放** 90-150 %、**卡拉OK 导出 SRT**、**分析器**频谱、五种语言的风格提示释义。\n- **修复：**分轨器下载（「unknown asset roformer」）、无 AVX-512 处理器上的卡拉OK、切换封面样式时的卡顿、每次启动都重置的设置、无人声乐谱的「仅伴奏」、关闭后仍在运行的 Mac 引擎、解压后的 Linux AppImage 播放、8 GB 的 Radeon 显卡。\n\n完整列表见「新功能」。",
+      "ja": "ステムと「オーディオ→MIDI」は audio.cpp に、変更内容を伝える更新画面、そして 3.7.0 で多かった不具合を修正。\n\n- **バリエーションでエンジンが止まらなくなりました：**バリエーション 2 以上での「CUDA error: an illegal memory access」は解消。\n- **ステムと「オーディオ→MIDI」は audio.cpp サーバーで動作、**Speech Studio・Dub Studio と同じ：HT-Demucs 6s は CUDA・Vulkan・プロセッサーで、MuScriptor は約2倍の速さ。\n- **更新画面：**初回起動時に、このバージョンで更新・追加・不要になるものと空く容量を表示し、ボタン一つで実行。\n- **すべてのダウンロードを配布元のハッシュで検証。**\n- **「耳でスタイル」がカードに合わせて動作：**16 GB のカードで長い曲でもメモリ不足にならず、12 GB 未満は小さい Q4_K_M 版、さらに小さいカードはプロセッサーで。\n- **画面の拡大縮小** 90-150 %、**カラオケの SRT 書き出し**、**アナライザー**スペクトル、5 言語のスタイル候補の訳。\n- **修正：**ステム分離のダウンロード（「unknown asset roformer」）、AVX-512 のないプロセッサーでのカラオケ、カバー表示切替時のフリーズ、起動のたびに戻る設定、声のない楽譜での「インストのみ」、閉じた後も残る Mac のエンジン、展開した Linux AppImage での再生、8 GB の Radeon カード。\n\nすべての変更は「新着情報」に。",
+      "ko": "스템과 오디오→MIDI는 audio.cpp로, 무엇이 바뀌는지 알려 주는 업데이트 화면, 그리고 3.7.0에서 가장 잦던 오류를 고쳤습니다.\n\n- **변형이 더 이상 엔진을 멈추지 않습니다:** 변형 2 이상에서 나던 \"CUDA error: an illegal memory access\"가 사라졌습니다.\n- **스템과 오디오→MIDI는 audio.cpp 서버에서,** Speech Studio·Dub Studio와 같은 서버: HT-Demucs 6s는 CUDA·Vulkan·프로세서에서, MuScriptor는 약 두 배 빠르게.\n- **업데이트 화면:** 처음 실행할 때 이 버전이 업데이트·추가·정리하는 것과 확보되는 공간을 보여 주고, 버튼 하나로 처리합니다.\n- **모든 다운로드를 배포처의 해시로 확인합니다.**\n- **귀로 스타일이 카드에 맞춰 동작:** 16GB 카드에서 긴 곡도 메모리가 부족하지 않고, 12GB 미만은 작은 Q4_K_M 빌드를, 더 작은 카드는 프로세서를 씁니다.\n- **화면 배율** 90-150 %, 영상 편집기용 **노래방 SRT**, **분석기** 스펙트럼, 다섯 언어의 스타일 제안 풀이.\n- **수정:** 스템 분리기 다운로드(\"unknown asset roformer\"), AVX-512 없는 프로세서의 노래방, 커버 모양 전환 시 멈춤, 실행할 때마다 초기화되던 설정, 목소리 없는 악보의 반주만, 닫은 뒤에도 남던 Mac 엔진, 압축을 푼 Linux AppImage 재생, 8GB Radeon 카드.\n\n전체 목록은 새 소식에 있습니다."
+    },
+    "tags": [
+      "YuE2",
+      "3.8.0"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-7-0",
+    "date": "2026-10-20",
+    "title": {
+      "en": "YuE2 Studio 3.7.0",
+      "ru": "YuE2 Studio 3.7.0",
+      "zh": "YuE2 Studio 3.7.0",
+      "ja": "YuE2 Studio 3.7.0",
+      "ko": "YuE2 Studio 3.7.0"
+    },
+    "body": {
+      "en": "Cleaner vocals, new words for a song you like, your own agent writing the lyrics, and karaoke on the engine of Dub Studio and Speech Studio.\n\n- **Cleaner vocals with Mel-Band RoFormer** (Q8_0) in Settings - Models - Stems, beside HT-Demucs.\n- **Sing again with new words:** a song comes back to the create form with its score and seeds, so new lyrics are sung on the same tune.\n- **LoRA from your own folder, without a copy:** the LoRAs you keep for ComfyUI or a trainer are taken in place.\n- **Instrumental only:** a switch above Create turns the voice into rests before anything is sung.\n- **Your own agent CLI writes the words:** Claude Code, Codex, opencode, Antigravity or Muse Code on this computer writes lyrics and styles.\n- **Stems named with tempo and key,** a unique cover pattern for every song, and lyrics in a video clip one click away.\n- **Fade in and fade out** for the made song.\n- **Karaoke on transcribe.cpp:** Parakeet v3 and Ultra as GGUF Q8_0 on CUDA, Vulkan, the processor and, again, on a Mac (Metal on Apple silicon); files shared with Dub Studio and Speech Studio, and the card freed after each recognition.\n- **One download for Audio to MIDI and training,** and Whisper on the card keeps int8 weights.\n- **Fixed** (with what 3.6.1 had prepared): the Linux engine and karaoke, a cover from FLAC, OGG or M4A, memory counted as the box says, a reset prompt that keeps its length and format, and Show in folder on Linux and macOS.\n\nThe whole family moved to 3.7.0: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Чище вокал, новые слова для понравившейся песни, свой агент пишет текст, а караоке — на движке Dub Studio и Speech Studio.\n\n- **Чище вокал с Mel-Band RoFormer** (Q8_0) в Настройки - Модели - Стемы, рядом с HT-Demucs.\n- **Спеть заново с новыми словами:** песня возвращается в форму создания с нотами и сидами, и новый текст поётся на тот же мотив.\n- **LoRA из своей папки без копии:** LoRA, которые лежат у вас для ComfyUI или тренера, берутся на месте.\n- **Только инструментал:** переключатель над «Создать» превращает вокал в паузы ещё до пения.\n- **Свой агент CLI пишет текст:** Claude Code, Codex, opencode, Antigravity или Muse Code на этом компьютере пишут слова и стили.\n- **Стемы с темпом и тональностью в имени,** уникальный узор обложки у каждой песни и текст в клипе в один клик.\n- **Плавное начало и затухание** у созданной песни.\n- **Караоке на transcribe.cpp:** Parakeet v3 и Ultra в GGUF Q8_0 на CUDA, Vulkan, процессоре и снова на Mac (Metal на Apple silicon); файлы общие с Dub Studio и Speech Studio, видеокарта освобождается после каждого распознавания.\n- **Одна закачка для «Аудио в MIDI» и обучения,** а Whisper на видеокарте держит веса int8.\n- **Исправлено** (вместе с подготовленным для 3.6.1): движок и караоке на Linux, кавер из FLAC, OGG и M4A, память по «коробочным» гигабайтам, сброс промпта с сохранением длины и формата, «Показать в папке» на Linux и macOS.\n\nВся семья перешла на 3.7.0: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "更干净的人声、给喜欢的歌换新词、用你自己的代理写歌词，卡拉OK 改用 Dub Studio 与 Speech Studio 的引擎。\n\n- **用 Mel-Band RoFormer 分离更干净的人声**（Q8_0）：设置 - 模型 - 分轨，与 HT-Demucs 并列。\n- **用新歌词重唱：**歌曲带着乐谱和种子回到创作表单，新歌词按同一旋律演唱。\n- **从你自己的文件夹使用 LoRA，无需复制：**你为 ComfyUI 或训练器保存的 LoRA 原地使用。\n- **仅伴奏：**「创作」上方的开关在演唱之前把人声变为休止。\n- **你自己的代理 CLI 写歌词：**本机上的 Claude Code、Codex、opencode、Antigravity 或 Muse Code 来写歌词和风格。\n- **分轨文件名带速度与调性，**每首歌独特的封面图案，视频中的歌词一键加入。\n- **生成歌曲的淡入与淡出。**\n- **卡拉OK 改用 transcribe.cpp：**Parakeet v3 与 Ultra（GGUF Q8_0）可在 CUDA、Vulkan、处理器上运行，Mac 上也重新可用（Apple 芯片用 Metal）；文件与 Dub Studio、Speech Studio 共用，每次识别后释放显卡。\n- **「音频转 MIDI」与训练合并为一个下载，**显卡上的 Whisper 保持 int8 权重。\n- **修复**（包括为 3.6.1 准备的内容）：Linux 上的引擎与卡拉OK、从 FLAC/OGG/M4A 翻唱、按包装标示计算内存、重置提示词时保留时长与格式、Linux 与 macOS 上的「在文件夹中显示」。\n\n整个家族升级到 3.7.0：YuE2 Studio、MiniMax Music3 Studio 与 ACE-Step Studio——同一内核，三个模型，链接见下方。",
+      "ja": "よりクリアなボーカル、気に入った曲に新しい歌詞、自分のエージェントが歌詞を書き、カラオケは Dub Studio と Speech Studio のエンジンで。\n\n- **Mel-Band RoFormer でよりクリアなボーカル**（Q8_0）：設定 - モデル - ステム、HT-Demucs と並んで。\n- **新しい歌詞で歌い直し：**曲が楽譜とシード付きで作成フォームに戻り、新しい歌詞が同じメロディで歌われます。\n- **自分のフォルダの LoRA をコピーなしで：**ComfyUI やトレーナー用に置いている LoRA をその場で使います。\n- **インストのみ：**「作成」の上のスイッチで、歌う前にボーカルを休符にします。\n- **自分のエージェント CLI が歌詞を書く：**このPCの Claude Code、Codex、opencode、Antigravity、Muse Code が歌詞とスタイルを書きます。\n- **ステムのファイル名にテンポとキー、**曲ごとのユニークなカバー模様、動画の歌詞はワンクリック。\n- **作った曲のフェードインとフェードアウト。**\n- **カラオケは transcribe.cpp で：**Parakeet v3 と Ultra（GGUF Q8_0）を CUDA、Vulkan、プロセッサーで、Mac でも再び（Apple シリコンは Metal）；ファイルは Dub Studio・Speech Studio と共有、認識のたびにグラフィックカードを解放。\n- **「オーディオ→MIDI」と学習が1つのダウンロードに、**グラフィックカード上の Whisper は int8 の重みのまま。\n- **修正**（3.6.1 向けに用意した内容も含む）：Linux のエンジンとカラオケ、FLAC・OGG・M4A からのカバー、箱の表記どおりのメモリ表示、長さと形式を保つプロンプトのリセット、Linux と macOS の「フォルダに表示」。\n\nファミリー全体が 3.7.0 に：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio——ひとつのコア、三つのモデル、リンクは下に。",
+      "ko": "더 깨끗한 보컬, 마음에 든 곡에 새 가사, 내 에이전트가 쓰는 가사, 그리고 Dub Studio·Speech Studio 엔진으로 도는 노래방.\n\n- **Mel-Band RoFormer로 더 깨끗한 보컬**(Q8_0): 설정 - 모델 - 스템, HT-Demucs 옆에.\n- **새 가사로 다시 부르기:** 곡이 악보와 시드와 함께 만들기 화면으로 돌아와, 새 가사를 같은 멜로디로 부릅니다.\n- **내 폴더의 LoRA를 복사 없이:** ComfyUI나 트레이너용으로 둔 LoRA를 그 자리에서 씁니다.\n- **반주만:** 만들기 위의 스위치로 노래하기 전에 보컬을 쉼표로 바꿉니다.\n- **내 에이전트 CLI가 가사를 씁니다:** 이 컴퓨터의 Claude Code, Codex, opencode, Antigravity, Muse Code가 가사와 스타일을 씁니다.\n- **스템 이름에 템포와 키,** 곡마다 고유한 커버 패턴, 영상 속 가사는 한 번의 클릭으로.\n- **만든 곡의 페이드 인과 페이드 아웃.**\n- **노래방은 transcribe.cpp로:** Parakeet v3와 Ultra(GGUF Q8_0)를 CUDA, Vulkan, 프로세서에서, Mac에서도 다시(Apple 실리콘은 Metal); 파일은 Dub Studio·Speech Studio와 공유하고, 인식할 때마다 그래픽 카드를 비웁니다.\n- **오디오→MIDI와 학습을 하나의 다운로드로,** 그래픽 카드의 Whisper는 int8 가중치를 유지합니다.\n- **수정**(3.6.1에 준비한 내용 포함): Linux 엔진과 노래방, FLAC·OGG·M4A로 커버, 상자 표기대로의 메모리, 길이와 형식을 지키는 프롬프트 초기화, Linux와 macOS의 폴더에서 보기.\n\n패밀리 전체가 3.7.0으로: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio — 하나의 코어, 세 개의 모델, 링크는 아래에."
+    },
+    "tags": [
+      "YuE2",
+      "3.7.0"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-6-0",
+    "date": "2026-10-16",
+    "title": {
+      "en": "YuE2 Studio 3.6.0",
+      "ru": "YuE2 Studio 3.6.0",
+      "zh": "YuE2 Studio 3.6.0",
+      "ja": "YuE2 Studio 3.6.0",
+      "ko": "YuE2 Studio 3.6.0"
+    },
+    "body": {
+      "en": "A library as roomy as a music service's, playlists to keep and play, Winamp on the studio's playlists, and track files that carry how they were made.\n\n- **The library.** Compact rows show three times as many songs, the tabs count them, filters pick where songs came from and those with karaoke or processed versions, and Recently played joins the orders. A right click opens a song's menu with Play next and Add to queue; a selection stays on screen, takes Shift ranges, Ctrl+A and Esc, and its songs can be liked, queued, downloaded, deleted or put in a playlist at once.\n- **Playlists.** A playlist is renamed and described in place, its songs move by dragging or Alt+Up/Down and are added from its own page, and a song taken out comes back with Undo. Its picture is its songs' covers, the song playing is marked, and Shuffle plays it in a mixed order.\n- **Winamp plays the studio's playlists.** Shuffle and repeat go into Winamp and come back; LOAD LIST and ADD open the playlists, the liked songs and the whole library, and SAVE LIST writes into the playlist the music came from or a new one.\n- **A track's file carries how it was made:** its note, its whole style and its generation settings, without paths on your computer. Importing such a file back fills Reuse Prompt in the studio that made it; Settings - Privacy turns it off.\n- **Several tracks to MIDI at once,** one after another, with the progress and Stop; a track that fails is named and the rest go on.\n- **OGG and FLAC import** into the library, and from there to MIDI, stems and karaoke.\n- **Every slider takes a typed number:** 0.40 for a LoRA's strength, 2:10 for a duration.\n- **Any engine launch flag and an engine of your own build** in Settings - Local engine.\n- **The version in the window title,** with \"Portable\" on a portable copy.\n- **Fixed:** an installation under Program Files downloads the engine's libraries; stems, karaoke and Audio to MIDI work on Linux; a stalled download starts again; \"Use models I already have\" takes only the models in the folder; a recording that will not play says why; and the studio answers only its own window and agents, not other sites.\n\nThe whole family moved to 3.6.0: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Библиотека не теснее, чем в музыкальном сервисе, плейлисты, которые можно вести и слушать, Winamp на плейлистах студии и файлы треков, которые помнят, как их сделали.\n\n- **Библиотека.** Компактные строки показывают втрое больше песен, вкладки считают их, фильтры выбирают, откуда песни (сделаны в студии, импортированы, стемы и обработка) и с караоке или обработкой, а в сортировках появилось «Недавно слушали». Правый клик открывает меню песни с «Играть следующей» и «В очередь»; выбор держит панель на экране, берёт диапазон через Shift, Ctrl+A и Esc, а выбранные можно разом отметить, поставить в очередь, скачать, удалить или добавить в плейлист.\n- **Плейлисты.** Название и описание меняются на месте, песни переставляются перетаскиванием или Alt+↑/↓ и добавляются прямо со страницы плейлиста, а убранная песня возвращается кнопкой «Отменить». Обложка - из обложек его песен, играющая песня подсвечена, «Перемешать» играет вперемешку.\n- **Winamp играет плейлисты студии.** Повтор и перемешивание переходят в Winamp и обратно; LOAD LIST и ADD открывают плейлисты, понравившиеся и всю библиотеку, а SAVE LIST пишет в плейлист, откуда взята музыка, или в новый.\n- **Файл трека помнит, как его сделали:** заметку, весь стиль и параметры генерации, без путей вашего компьютера. Импорт такого файла обратно заполняет «Повторить промпт» в студии, которая его сделала; выключается в «Настройки - Приватность».\n- **Несколько треков в MIDI разом,** один за другим, с прогрессом и «Стоп»; сбойный трек назван, остальные идут дальше.\n- **Импорт OGG и FLAC** в библиотеку, а оттуда в MIDI, стемы и караоке.\n- **У каждого ползунка - поле для числа:** 0.40 для силы LoRA, 2:10 для длительности.\n- **Любые флаги запуска движка и свой собранный движок** в «Настройки - Локальный движок».\n- **Версия в заголовке окна,** а у портативной копии - «Portable».\n- **Исправлено:** установка в Program Files скачивает библиотеки движка; стемы, караоке и Audio to MIDI работают на Linux; зависшая загрузка начинается снова; «Взять мои модели» берёт только те модели, что в папке; запись, которая не играет, говорит почему; студия отвечает только своему окну и агентам, а не чужим сайтам.\n\nВся семья перешла на 3.6.0: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "像音乐服务一样宽敞的曲库、可以整理和播放的歌单、Winamp 播放工作室的歌单，以及记录制作方式的音轨文件。\n\n- **曲库。** 紧凑行可显示三倍的歌曲，标签页显示数量，筛选可按来源（工作室生成、导入、分轨与处理）和是否带卡拉 OK 或处理版本，排序新增“最近播放”。右键打开歌曲菜单，含“下一首播放”和“加入队列”；多选时工具栏始终可见，支持 Shift 连选、Ctrl+A 和 Esc，选中的歌曲可一次收藏、加入队列、下载、删除或加入歌单。\n- **歌单。** 名称和描述可直接修改，歌曲可拖动或用 Alt+↑/↓ 调整顺序，并可在歌单页直接添加；移除的歌曲可撤销恢复。封面由歌曲封面组成，正在播放的歌曲会高亮，“随机播放”打乱顺序播放。\n- **Winamp 播放工作室的歌单。** 随机和循环在 Winamp 与工作室之间同步；LOAD LIST 和 ADD 打开歌单、喜欢的歌曲和整个曲库，SAVE LIST 写回音乐来源的歌单或新歌单。\n- **音轨文件记录制作方式：** 备注、完整风格和生成参数，不含你电脑上的路径。把这样的文件导回生成它的工作室，会填好“复用提示词”；可在“设置 - 隐私”中关闭。\n- **一次将多首音轨转为 MIDI，** 依次进行，显示进度并可停止；失败的音轨会注明，其余继续。\n- **导入 OGG 和 FLAC** 到曲库，并可转为 MIDI、分轨和卡拉 OK。\n- **每个滑块都可输入数字：** LoRA 强度 0.40，时长 2:10。\n- **任意引擎启动参数和自行编译的引擎**，见“设置 - 本地引擎”。\n- **窗口标题显示版本，** 便携版标注“Portable”。\n- **修复：** 安装在 Program Files 时可下载引擎库；Linux 上分轨、卡拉 OK 和 Audio to MIDI 可用；卡住的下载会重新开始；“使用已有模型”只取文件夹中的模型；无法播放的录音会说明原因；工作室只响应自己的窗口和代理，不响应其他网站。\n\n整个家族升级到 3.6.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一内核，三个模型，链接见下方。",
+      "ja": "音楽サービス並みに広いライブラリ、整理して再生できるプレイリスト、スタジオのプレイリストを流す Winamp、そして作り方を覚えているトラックファイル。\n\n- **ライブラリ。** コンパクト表示で 3 倍の曲が並び、タブは曲数を表示し、フィルターで出どころ（スタジオで作成、インポート、ステムと処理）やカラオケ・処理版の有無を選べ、並び順に「最近再生」が加わりました。右クリックで曲のメニューが開き、「次に再生」と「キューに追加」があります。選択中はバーが画面に残り、Shift で範囲、Ctrl+A、Esc が使え、選んだ曲をまとめていいね、キュー追加、ダウンロード、削除、プレイリスト追加できます。\n- **プレイリスト。** 名前と説明はその場で変更でき、曲はドラッグか Alt+↑/↓ で並べ替え、プレイリストのページから追加でき、外した曲は「元に戻す」で戻ります。画像は曲のカバーから作られ、再生中の曲が示され、「シャッフル」で混ぜて再生します。\n- **Winamp がスタジオのプレイリストを再生。** シャッフルとリピートは Winamp と行き来し、LOAD LIST と ADD でプレイリスト、いいねした曲、ライブラリ全体を開き、SAVE LIST は元のプレイリストか新しいものに書き込みます。\n- **トラックのファイルに作り方が残ります：** メモ、スタイル全体、生成設定（PC 上のパスは含みません）。そのファイルを作ったスタジオに読み込むと「プロンプトを再利用」が埋まります。「設定 - プライバシー」でオフにできます。\n- **複数のトラックをまとめて MIDI に、** 順番に、進捗と停止付きで。失敗したトラックは名前が示され、残りは続きます。\n- **OGG と FLAC のインポート**、そこから MIDI、ステム、カラオケへ。\n- **すべてのスライダーに数値入力：** LoRA の強さに 0.40、長さに 2:10。\n- **エンジンの任意の起動フラグと自作ビルドのエンジン**を「設定 - ローカルエンジン」で。\n- **ウィンドウタイトルにバージョン、** ポータブル版には「Portable」。\n- **修正：** Program Files へのインストールでエンジンのライブラリをダウンロード、Linux でステム・カラオケ・Audio to MIDI が動作、止まったダウンロードが再開、「手持ちのモデルを使う」はフォルダー内のモデルだけを取り込み、再生できない録音は理由を表示、スタジオは自分のウィンドウとエージェントにだけ応答し、他のサイトには応答しません。\n\nファミリー全体が 3.6.0 になりました：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio - ひとつのコア、三つのモデル、リンクは下に。",
+      "ko": "음악 서비스만큼 넉넉한 라이브러리, 정리하고 재생할 수 있는 재생목록, 스튜디오 재생목록을 트는 Winamp, 그리고 만든 방법을 기억하는 트랙 파일.\n\n- **라이브러리.** 간단히 보기는 세 배 많은 곡을 보여 주고, 탭은 곡 수를 세며, 필터로 출처(스튜디오에서 생성, 가져오기, 스템과 처리)와 노래방·처리 버전 여부를 고를 수 있고, 정렬에 '최근 재생'이 추가되었습니다. 오른쪽 클릭으로 곡 메뉴가 열리고 '다음에 재생'과 '대기열에 추가'가 있습니다. 선택 중에는 막대가 화면에 남고 Shift 범위, Ctrl+A, Esc를 쓸 수 있으며, 고른 곡을 한 번에 좋아요, 대기열 추가, 다운로드, 삭제, 재생목록에 추가할 수 있습니다.\n- **재생목록.** 이름과 설명은 그 자리에서 바꾸고, 곡은 끌어서 또는 Alt+↑/↓로 순서를 바꾸며 재생목록 페이지에서 바로 추가하고, 뺀 곡은 '실행 취소'로 돌아옵니다. 표지는 곡 표지로 만들어지고, 재생 중인 곡이 표시되며, '셔플'은 섞어서 재생합니다.\n- **Winamp가 스튜디오 재생목록을 재생합니다.** 셔플과 반복은 Winamp와 오가고, LOAD LIST와 ADD는 재생목록, 좋아요한 곡, 라이브러리 전체를 열며, SAVE LIST는 음악을 가져온 재생목록이나 새 재생목록에 씁니다.\n- **트랙 파일이 만든 방법을 담습니다:** 메모, 전체 스타일, 생성 설정(컴퓨터의 경로는 제외). 그 파일을 만든 스튜디오로 다시 가져오면 '프롬프트 재사용'이 채워집니다. '설정 - 개인정보'에서 끌 수 있습니다.\n- **여러 트랙을 한 번에 MIDI로,** 차례로, 진행 상황과 중지와 함께. 실패한 트랙은 이름이 표시되고 나머지는 계속됩니다.\n- **OGG와 FLAC 가져오기**, 거기서 MIDI, 스템, 노래방으로.\n- **모든 슬라이더에 숫자 입력:** LoRA 강도 0.40, 길이 2:10.\n- **엔진 실행 플래그와 직접 빌드한 엔진**을 '설정 - 로컬 엔진'에서.\n- **창 제목에 버전,** 포터블 사본에는 'Portable'.\n- **수정:** Program Files에 설치해도 엔진 라이브러리를 내려받고, Linux에서 스템·노래방·Audio to MIDI가 작동하며, 멈춘 다운로드가 다시 시작되고, '가진 모델 사용'은 폴더에 있는 모델만 가져오며, 재생되지 않는 녹음은 이유를 알려 주고, 스튜디오는 자기 창과 에이전트에만 응답하고 다른 사이트에는 응답하지 않습니다.\n\n패밀리 전체가 3.6.0으로 올라갔습니다: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio - 하나의 코어, 세 개의 모델, 링크는 아래에."
+    },
+    "tags": [
+      "YuE2",
+      "3.6.0"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-5-0",
+    "date": "2026-10-08",
+    "title": {
+      "en": "YuE2 Studio 3.5.0",
+      "ru": "YuE2 Studio 3.5.0",
+      "zh": "YuE2 Studio 3.5.0",
+      "ja": "YuE2 Studio 3.5.0",
+      "ko": "YuE2 Studio 3.5.0"
+    },
+    "body": {
+      "en": "Songs you can extend that keep to their score, sound kept exactly as the model made it, the notation as a PDF, and anonymous statistics that show what they send.\n\n- **Extend a song.** Re-render now composes on from the track's last frame by 15 seconds to 2 minutes, and the part you have stays as it is. Songs go up to 10 minutes.\n- **Words follow the score.** On a cover or any song with a score, each section's words wait until the score reaches it, so the voice keeps to the band (HOT-Step's lyric schedule).\n- **A song as the model made it.** Lossless FLAC by default, written by libFLAC, MP3 when you choose it, and nothing changes its level on the way; Normalise is now a stage under Process. FLAC files carry the title, lyrics and cover like MP3s.\n- **The realaudio decoder on Auto.** It renders the YuE2 checkpoint alone, as audio.cpp and ComfyUI do, and uses the decoder adapter only under a LoRA trained in the studio.\n- **The notation as a PDF.** The score view saves the notation as an A4 PDF.\n- **Video export.** It takes a frame size and an audio bitrate, its visualizer moves as in the player, and the background no longer freezes on zoom.\n- **Audio to MIDI on every card.** CUDA where the engine runs CUDA 13, the processor elsewhere.\n- **Quitting mid-song.** Quitting while a song is made asks first; a song the studio was closed on starts again.\n- **The engine of 8 October.** The engine follows yue2.cpp of 8 October: SheetSage2 now reads MERT-v2 from a file of its own, downloaded once in Settings - Models (the studio runs without it until then).\n- **A faster trainer.** The trainer follows HOT-Step and is about 14% faster per step; a LoRA gets the style phrase it was trained on.\n- **LoRAs.** New ones by becausereasons: raspy rock-soul, quiet storm R&B and dark Sufi fusion. The ntc-ai slider LoRAs are at v2, and updating a LoRA from the catalogue no longer leaves its old weights behind.\n- **Instrumental from a score.** One button in the score view hands the voice's notes to the instrument and keeps the chords.\n- **A note on every song.** Every song takes a note, and its parameters go to the form, to JSON on screen or to a file.\n- **Parakeet Ultra for karaoke.** Karaoke can recognise words with Parakeet Ultra int8, Moondream's fine-tune, as a choice beside v3.\n- **Anonymous statistics.** The start screen and Settings - Anonymous statistics have a checkbox, on by default, with which the studio sends once a day how many songs were made and with which model set, its version, the OS and the class of the graphics card - never lyrics, prompts, audio or file names. What is sent shows today's report exactly.\n- **News without an update.** News from the author now arrive without an update and appear at the top of this page.\n- **Smaller things:** the song card shows the engine's stage, its step and the time left, downloads can go through the Hugging Face mirror (Settings - Network), the MIDI editor keeps notes in place in files from Reaper, the window keeps its size and place, and the player its repeat and shuffle.\n\nThe whole family moved to 3.5.0: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Песни, которые можно продлить и которые идут по партитуре, звук ровно таким, каким его сделала модель, ноты в PDF и анонимная статистика, которая показывает, что отправляет.\n\n- **Продление песни.** «Перерендер» теперь дописывает трек от последнего кадра на время от 15 секунд до 2 минут, а то, что уже есть, остаётся как было. Песни - до 10 минут.\n- **Текст по ходу партитуры.** В кавере и в любой песне с партитурой слова каждой секции ждут, пока партитура до неё дойдёт, и голос не уходит от музыки (расписание текста из HOT-Step).\n- **Песня такой, какой её сделала модель.** По умолчанию FLAC без потерь (кодирует libFLAC), MP3 - если выбрать, и громкость по дороге никто не трогает; нормализация теперь стадия в «Обработке». В FLAC пишутся название, текст и обложка, как в MP3.\n- **Декодер realaudio - «Авто».** Звук одного чекпоинта YuE2, как в audio.cpp и ComfyUI, а адаптер декодера - только под LoRA, обученной в студии.\n- **Ноты в PDF.** Вид партитуры сохраняет ноты в PDF A4.\n- **Экспорт видео.** С размером кадра и битрейтом звука, визуализатор двигается как в плеере, фон больше не замирает на приближении.\n- **MIDI из аудио на любой карте.** CUDA там, где движок идёт на CUDA 13, иначе процессор.\n- **Выход посреди генерации.** Выход во время генерации спрашивает подтверждение, а песня, на которой студию закрыли, запускается снова.\n- **Движок от 8 октября.** Движок обновлён до yue2.cpp от 8 октября: SheetSage2 теперь читает MERT-v2 отдельным файлом, он скачивается один раз в «Настройках - Модели» (до этого студия работает без него).\n- **Тренер быстрее.** Тренер обновлён по HOT-Step и примерно на 14% быстрее за шаг; LoRA получает ту фразу стиля, на которой её учили.\n- **LoRA.** Новые от becausereasons: хриплый рок-соул, квайет-сторм R&B и тёмный суфийский фьюжн. LoRA-слайдеры ntc-ai обновлены до v2, а обновление LoRA из каталога больше не оставляет старые веса.\n- **«Инструментал» из партитуры.** Одна кнопка в виде партитуры отдаёт ноты голоса инструменту и сохраняет аккорды.\n- **Заметка к каждой песне.** К каждой песне можно написать заметку, а её параметры передать в форму, показать как JSON или сохранить файлом.\n- **Parakeet Ultra в караоке.** Караоке может распознавать слова Parakeet Ultra int8 (дообученная Moondream модель) - отдельным вариантом рядом с v3.\n- **Анонимная статистика.** На стартовом экране и в «Настройках - Анонимная статистика» есть галочка (по умолчанию включена): раз в день студия отправляет, сколько песен сделано и каким набором моделей, свою версию, ОС и класс видеокарты - ни текстов, ни промптов, ни звука, ни имён файлов. «Что отправляется» показывает сегодняшний отчёт как есть.\n- **Новости без обновления.** Новости от автора теперь приходят без обновления и встают в начало этой страницы.\n- **По мелочи:** карточка песни показывает этап движка, шаг и сколько осталось, скачивать можно через зеркало Hugging Face («Настройки - Сеть»), редактор MIDI не сдвигает ноты в файлах из Reaper, окно помнит размер и место, а плеер - повтор и перемешивание.\n\nВся семья перешла на 3.5.0: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "可以延长并跟随乐谱的歌曲、按模型原样保存的声音、PDF 乐谱，以及会显示发送内容的匿名统计。\n\n- **延长歌曲。** 重新渲染现在可以从曲目最后一帧继续创作 15 秒到 2 分钟，已有部分保持不变。歌曲最长 10 分钟。\n- **歌词跟随乐谱。** 翻唱及任何带乐谱的歌曲中，每段歌词等乐谱进行到该段落才出现，人声不再脱离伴奏（HOT-Step 的歌词时间表）。\n- **按模型生成的原样保存。** 默认无损 FLAC（由 libFLAC 编码），可选 MP3，过程中不改变音量；标准化现在是“处理”中的一个阶段。FLAC 文件与 MP3 一样写入标题、歌词和封面。\n- **realaudio 解码器为“自动”。** 仅用 YuE2 检查点解码，与 audio.cpp 和 ComfyUI 相同，只有在工作室训练的 LoRA 下才使用解码器适配器。\n- **乐谱导出 PDF。** 乐谱视图可将乐谱保存为 A4 PDF。\n- **视频导出。** 可选画面尺寸和音频码率，可视化与播放器一致，背景缩放不再卡住。\n- **所有显卡都能音频转 MIDI。** 引擎运行 CUDA 13 时使用 CUDA，其他情况使用处理器。\n- **生成中退出。** 生成歌曲时退出会先询问；关闭时中断的歌曲会重新开始。\n- **10 月 8 日的引擎。** 引擎更新到 10 月 8 日的 yue2.cpp：SheetSage2 现在从单独文件读取 MERT-v2，只需在“设置 - 模型”中下载一次（此前工作室照常运行）。\n- **更快的训练器。** 训练器随 HOT-Step 更新，每步约快 14%；LoRA 使用其训练时的风格短语。\n- **LoRA。** 新增 becausereasons 的 LoRA：沙哑摇滚灵魂乐、quiet storm R&B 和暗黑苏菲融合。ntc-ai 滑块 LoRA 更新到 v2，从目录更新 LoRA 不再残留旧权重。\n- **乐谱一键转器乐。** 乐谱视图中的按钮把人声音符交给乐器并保留和弦。\n- **每首歌都可写备注。** 每首歌可写备注，其参数可送入表单、显示为 JSON 或保存为文件。\n- **卡拉 OK 支持 Parakeet Ultra。** 卡拉 OK 可用 Parakeet Ultra int8（Moondream 微调版）识别歌词，作为 v3 之外的独立选项。\n- **匿名统计。** 开始界面和“设置 - 匿名统计”中有一个默认勾选的复选框，工作室每天发送一次生成了多少首歌、用的哪套模型、版本、操作系统和显卡档次——绝不发送歌词、提示词、音频或文件名；“发送的内容”原样显示今天的报告。\n- **无需更新的新闻。** 作者的新闻现在无需更新即可送达，并显示在本页顶部。\n- **细节：** 歌曲卡片显示引擎阶段、步数和剩余时间，下载可通过 Hugging Face 镜像（设置 - 网络），MIDI 编辑器不再错位 Reaper 文件中的音符，窗口记住大小和位置，播放器记住循环和随机。\n\n整个系列都升级到了 3.5.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一个核心，三个模型，链接见下方。",
+      "ja": "延長できて楽譜に沿う曲、モデルが作ったままの音、PDF の楽譜、そして送信内容を見せる匿名の統計。\n\n- **曲の延長。** 再レンダリングで、トラックの最後のフレームから 15 秒〜2 分続けて作曲でき、既存の部分はそのまま残ります。曲は最長 10 分。\n- **歌詞を楽譜に合わせる。** カバーや楽譜付きの曲では、各セクションの歌詞は楽譜がそこに達するまで待つので、声が伴奏からずれません（HOT-Step の歌詞スケジュール）。\n- **モデルが作ったままの曲。** 既定はロスレス FLAC（libFLAC でエンコード）、選べば MP3、途中で音量は変えません。ノーマライズは「処理」のステージになりました。FLAC にも MP3 と同じくタイトル、歌詞、カバーが入ります。\n- **realaudio デコーダーは「自動」。** YuE2 チェックポイントのみでデコードし（audio.cpp や ComfyUI と同じ）、スタジオで学習した LoRA のときだけデコーダーアダプターを使います。\n- **楽譜を PDF に。** 楽譜ビューは楽譜を A4 の PDF に保存できます。\n- **動画の書き出し。** フレームサイズと音声ビットレートを選べ、ビジュアライザーはプレーヤーと同じ動きになり、ズーム時に背景が止まらなくなりました。\n- **音声から MIDI はすべてのカードで。** エンジンが CUDA 13 で動く環境では CUDA、それ以外は CPU。\n- **生成中の終了。** 生成中に終了すると確認し、閉じたときに中断した曲は再開されます。\n- **10 月 8 日のエンジン。** エンジンを 10 月 8 日の yue2.cpp に更新：SheetSage2 は MERT-v2 を別ファイルから読み込み、「設定 - モデル」で一度だけダウンロードします（それまでもスタジオは動作します）。\n- **速くなったトレーナー。** トレーナーは HOT-Step に合わせて更新され、1 ステップ約 14% 高速に。LoRA は学習時のスタイル文で使われます。\n- **LoRA。** becausereasons の新しい LoRA：ハスキー・ロックソウル、クワイエット・ストーム R&B、ダーク・スーフィー・フュージョン。ntc-ai のスライダー LoRA は v2 になり、カタログから LoRA を更新しても古い重みが残らなくなりました。\n- **楽譜からインストゥルメンタル。** 楽譜ビューのボタン一つで歌のノートを楽器に渡し、コードはそのまま残します。\n- **曲ごとのメモ。** 曲ごとにメモを書け、パラメーターはフォームへ送る、JSON で表示する、ファイルに保存することができます。\n- **カラオケに Parakeet Ultra。** カラオケは Parakeet Ultra int8（Moondream のファインチューン）で歌詞を認識でき、v3 とは別の選択肢です。\n- **匿名の統計。** 開始画面と「設定 - 匿名の統計」に既定でオンのチェックボックスがあり、スタジオは1日1回、作った曲の数と使ったモデルセット、バージョン、OS、グラフィックカードのクラスを送信します。歌詞・プロンプト・音声・ファイル名は送りません。「送信される内容」で今日のレポートをそのまま確認できます。\n- **アップデートなしで届くニュース。** 作者からのニュースはアップデートなしで届き、このページの一番上に表示されます。\n- **細かな改善：** 曲のカードにエンジンの段階、ステップ、残り時間を表示、ダウンロードは Hugging Face ミラー（設定 - ネットワーク）経由も可能、MIDI エディターは Reaper のファイルでノートがずれなくなり、ウィンドウはサイズと位置を、プレーヤーはリピートとシャッフルを記憶します。\n\nシリーズ全体が 3.5.0 になりました：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio ― ひとつのコア、三つのモデル。リンクは下にあります。",
+      "ko": "연장할 수 있고 악보를 따르는 곡, 모델이 만든 그대로의 소리, PDF 악보, 그리고 보내는 내용을 보여 주는 익명 통계.\n\n- **곡 연장.** 다시 렌더링에서 트랙의 마지막 프레임부터 15초~2분을 이어서 작곡하며, 기존 부분은 그대로 남습니다. 곡은 최대 10분.\n- **가사를 악보에 맞추기.** 커버나 악보가 있는 곡에서 각 섹션의 가사는 악보가 그 섹션에 이를 때까지 기다리므로 목소리가 반주에서 벗어나지 않습니다(HOT-Step의 가사 스케줄).\n- **모델이 만든 그대로.** 기본은 무손실 FLAC(libFLAC 인코딩), 선택하면 MP3이며, 도중에 음량을 바꾸지 않습니다. 노멀라이즈는 이제 '처리'의 단계입니다. FLAC에도 MP3처럼 제목, 가사, 커버가 들어갑니다.\n- **realaudio 디코더는 '자동'.** YuE2 체크포인트만으로 디코딩하며(audio.cpp, ComfyUI와 동일), 스튜디오에서 학습한 LoRA일 때만 디코더 어댑터를 씁니다.\n- **악보를 PDF로.** 악보 보기에서 악보를 A4 PDF로 저장할 수 있습니다.\n- **영상 내보내기.** 프레임 크기와 오디오 비트레이트를 고를 수 있고, 시각화가 플레이어와 같이 움직이며, 확대 시 배경이 멈추지 않습니다.\n- **모든 그래픽카드에서 오디오를 MIDI로.** 엔진이 CUDA 13으로 실행되면 CUDA, 그 외에는 CPU.\n- **생성 중 종료.** 생성 중 종료하면 먼저 묻고, 닫힐 때 중단된 곡은 다시 시작됩니다.\n- **10월 8일 엔진.** 엔진을 10월 8일 yue2.cpp로 업데이트: SheetSage2는 이제 MERT-v2를 별도 파일에서 읽으며, 설정 - 모델에서 한 번만 내려받습니다(그 전에도 스튜디오는 동작합니다).\n- **더 빨라진 트레이너.** 트레이너는 HOT-Step에 맞춰 업데이트되어 스텝당 약 14% 빨라졌고, LoRA는 학습된 스타일 문장으로 사용됩니다.\n- **LoRA.** becausereasons의 새 LoRA: 허스키 록 소울, 콰이어트 스톰 R&B, 다크 수피 퓨전. ntc-ai 슬라이더 LoRA가 v2로 업데이트되었고, 카탈로그에서 LoRA를 업데이트해도 이전 가중치가 남지 않습니다.\n- **악보에서 인스트루멘털.** 악보 보기의 버튼 하나로 보컬 음표를 악기에 넘기고 코드는 유지합니다.\n- **곡마다 메모.** 곡마다 메모를 남길 수 있고, 파라미터를 폼으로 보내거나 JSON으로 보거나 파일로 저장할 수 있습니다.\n- **노래방에 Parakeet Ultra.** 노래방은 Parakeet Ultra int8(Moondream 파인튜닝)로 가사를 인식할 수 있으며 v3와 별도의 선택지입니다.\n- **익명 통계.** 시작 화면과 '설정 - 익명 통계'에 기본으로 켜진 체크박스가 있어, 스튜디오가 하루 한 번 만든 곡 수와 사용한 모델 세트, 버전, OS, 그래픽카드 등급을 보냅니다. 가사, 프롬프트, 오디오, 파일 이름은 보내지 않습니다. '보내는 내용'에서 오늘 보고서를 그대로 볼 수 있습니다.\n- **업데이트 없이 오는 소식.** 작가의 소식은 이제 업데이트 없이 도착해 이 페이지 맨 위에 표시됩니다.\n- **작은 개선:** 곡 카드에 엔진 단계, 스텝, 남은 시간이 표시되고, 다운로드는 Hugging Face 미러(설정 - 네트워크)로도 가능하며, MIDI 편집기가 Reaper 파일의 음표를 밀지 않고, 창은 크기와 위치를, 플레이어는 반복과 셔플을 기억합니다.\n\n시리즈 전체가 3.5.0이 되었습니다: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio - 하나의 코어, 세 개의 모델, 링크는 아래에 있습니다."
+    },
+    "tags": [
+      "YuE2",
+      "3.5.0"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-4-0",
+    "date": "2026-10-01",
+    "title": {
+      "en": "YuE2 Studio 3.4.0",
+      "ru": "YuE2 Studio 3.4.0",
+      "zh": "YuE2 Studio 3.4.0",
+      "ja": "YuE2 Studio 3.4.0",
+      "ko": "YuE2 Studio 3.4.0"
+    },
+    "body": {
+      "en": "A MIDI editor inside the studio, the score edited in it, and a song form with finer control.\n\n- **A MIDI editor inside the studio.** The editor is signal, with a multitrack piano roll, instruments, drums, tempo, MIDI input and recording, and editable chord and section lanes. Open it from Studio tools or Edit MIDI on a track.\n- **Audio and MIDI in the library.** Save a new song as rendered audio and MIDI in the library; edits to an existing MIDI stay on its track.\n- **Local only.** Everything runs locally, without the editor's cloud services or analytics.\n- **The score in the same editor.** In YuE2 the same editor opens the create form's score, and Apply returns the edited MIDI to ABC with its chords and sections.\n- **MIDI as a score and a cover.** Import MIDI as a score and use your MIDI song as a cover source.\n- **Decoder companion and training recipe.** The decoder companion and the CUDA-only HOT-Step training recipe are included.\n- **Style from musical fields.** Build the style from musical fields and arrange the lyrics in editable sections.\n- **The writing assistant.** It accepts a language, a target of 8–32 lines and additional instructions.\n- **The song form.** It adds voice and tempo fields, section and line/stanza operations, and text case tools. Keep/Words preserve the lyric text; checkpoint markers use the engine's exact tokens.\n- **Score plans.** They can be selected in batches, and repeated sections mirror their chords. MIDI grid and octave controls help edit the score.\n- **Transposition.** Generation supports transposition from −24 to +24 semitones.\n- **Vocals only.** Native HT-Demucs vocals-only output as MP3 or 32-bit WAV.\n- **LoRA switches.** Each LoRA has its own switch, with signed weights from −10 to +10.\n\nThe whole family moved to 3.4.0 on the same day: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models.",
+      "ru": "MIDI-редактор прямо в студии, партитура в нём же и форма песни с более тонкой настройкой.\n\n- **MIDI-редактор прямо в студии.** Это signal с многодорожечным пиано-роллом, инструментами, ударными, темпом, MIDI-вводом и записью, редактируемыми полосами аккордов и секций. Открывается из «Инструментов» или через «Редактировать MIDI» у трека.\n- **Звук и MIDI в библиотеке.** Новая песня сохраняется в библиотеку со звуком и MIDI; изменения существующего MIDI остаются у его трека.\n- **Только локально.** Всё работает локально, без облака и аналитики редактора.\n- **Партитура в том же редакторе.** В YuE2 тот же редактор открывает партитуру формы создания, а «Применить» возвращает отредактированный MIDI в ABC с аккордами и секциями.\n- **MIDI как партитура и основа кавера.** Можно импортировать MIDI как партитуру и взять MIDI-песню основой кавера.\n- **Компаньон декодера и рецепт обучения.** Включены компаньон декодера и рецепт обучения HOT-Step только на CUDA.\n- **Стиль из музыкальных полей.** Собирайте стиль из музыкальных полей и редактируйте текст по секциям.\n- **Помощник по тексту.** Для помощника можно выбрать язык, объём 8–32 строки и дополнительные указания.\n- **Форма песни.** В ней появились поля голоса и темпа, операции с секциями, строками и строфами, а также смена регистра текста. Keep/Words сохраняют текст; маркеры контрольных точек используют точные токены движка.\n- **Планы партитуры.** Можно выбрать несколько планов сразу; повторы секций зеркалят аккорды. Для MIDI доступны сетка и октава.\n- **Транспонирование.** Генерация поддерживает транспонирование от −24 до +24 полутонов.\n- **Только вокал.** Режим только вокала через нативный HT-Demucs с MP3 или 32-битным WAV.\n- **Переключатели LoRA.** Отдельные переключатели LoRA с весами от −10 до +10.\n\nВся семья перешла на 3.4.0 в один день: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели.",
+      "zh": "工作室内置 MIDI 编辑器，乐谱也在其中编辑，歌曲表单控制更细。\n\n- **工作室内置 MIDI 编辑器。** 即 signal：多轨钢琴卷帘、乐器、鼓、速度、MIDI 输入与录制，以及可编辑的和弦和段落栏。从工具页或曲目的 MIDI 编辑入口打开。\n- **音频和 MIDI 存入曲库。** 新歌曲以音频和 MIDI 保存到曲库，已有 MIDI 的编辑保留在原曲目上。\n- **完全本地。** 编辑器本地运行，无云服务或分析。\n- **在同一编辑器中编辑乐谱。** YuE2 使用同一个编辑器编辑创建表单中的乐谱，应用将 MIDI 转回含和弦与段落的 ABC。\n- **MIDI 用作乐谱和翻唱。** 支持将 MIDI 导入为乐谱并用于翻唱。\n- **解码器伴随适配器和训练方案。** 包含解码器伴随适配器和仅 CUDA 的 HOT-Step 训练方案。\n- **用音乐字段构建风格。** 可使用音乐字段构建风格，并按段落编辑歌词。\n- **写作助手。** 支持语言、8–32 行目标及额外说明。\n- **歌曲表单。** 新增声音和速度字段、段落与行/诗节操作以及大小写工具。Keep/Words 保留歌词，检查点标记使用引擎的精确 token。\n- **乐谱方案。** 可批量选择乐谱方案，重复段落会同步和弦；MIDI 提供网格和八度控制。\n- **移调。** 生成支持 −24 至 +24 半音移调。\n- **纯人声。** 通过原生 HT-Demucs 输出纯人声 MP3 或 32 位 WAV。\n- **LoRA 开关。** 每个 LoRA 独立开关，权重 −10 至 +10。\n\n整个系列在同一天升级到 3.4.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一个核心，三个模型。",
+      "ja": "スタジオ内の MIDI エディター、そこで編集する楽譜、そしてより細かく調整できる曲のフォーム。\n\n- **スタジオ内の MIDI エディター。** signal を統合しました。マルチトラックのピアノロール、楽器、ドラム、テンポ、MIDI 入力と録音、編集可能なコードとセクションのレーンを備え、ツールまたは曲の MIDI 編集から開きます。\n- **音声と MIDI をライブラリに。** 新しい曲を音声と MIDI としてライブラリに保存できます。既存 MIDI の編集は元の曲に保存されます。\n- **ローカルのみ。** クラウドや解析を使わずローカルで動作します。\n- **同じエディターで楽譜を。** YuE2 では同じエディターで作成フォームの楽譜も編集でき、適用するとコードとセクションを含む ABC に戻します。\n- **MIDI を楽譜とカバーに。** MIDI の楽譜への読み込みとカバーへの利用ができます。\n- **デコーダーのコンパニオンと学習レシピ。** デコーダーのコンパニオンと CUDA 専用 HOT-Step 学習も含まれます。\n- **音楽の項目からスタイル。** 音楽の項目からスタイルを組み立て、歌詞をセクションごとに編集できます。\n- **文章作成アシスタント。** 言語、8～32 行の目標、追加の指示を指定できます。\n- **曲のフォーム。** 声とテンポ、セクション・行・連の操作、大文字と小文字の変換を追加しました。Keep/Words は歌詞を保持し、チェックポイントはエンジンの正確なトークンを使います。\n- **楽譜案。** 複数選択でき、反復セクションではコードも同期します。MIDI にはグリッドとオクターブ設定があります。\n- **移調。** 生成は −24～+24 半音の移調に対応します。\n- **ボーカルのみ。** ネイティブ HT-Demucs によるボーカルのみの MP3 または 32 ビット WAV。\n- **LoRA ごとのスイッチ。** LoRA ごとのオン・オフと −10～+10 の重み。\n\nシリーズ全体が同じ日に 3.4.0 になりました：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio ― ひとつのコア、三つのモデル。",
+      "ko": "스튜디오 안의 MIDI 편집기, 그 안에서 편집하는 악보, 그리고 더 세밀해진 곡 양식.\n\n- **스튜디오 안의 MIDI 편집기.** signal을 통합했습니다. 멀티트랙 피아노롤, 악기, 드럼, 템포, MIDI 입력과 녹음, 편집 가능한 코드 및 섹션 레인을 제공하며, 도구 페이지나 곡의 MIDI 편집에서 엽니다.\n- **오디오와 MIDI를 라이브러리에.** 새 곡을 오디오와 MIDI로 라이브러리에 저장하고 기존 MIDI 편집은 원래 곡에 보관합니다.\n- **로컬 전용.** 클라우드와 분석 없이 로컬에서 실행됩니다.\n- **같은 편집기에서 악보를.** YuE2에서는 같은 편집기로 생성 폼의 악보도 편집하며, 적용하면 코드와 섹션을 포함한 ABC로 돌아갑니다.\n- **MIDI를 악보와 커버로.** MIDI 악보 가져오기와 커버 소스 사용을 지원합니다.\n- **디코더 컴패니언과 학습 레시피.** 디코더 컴패니언 및 CUDA 전용 HOT-Step 학습도 포함합니다.\n- **음악 항목으로 스타일.** 음악 항목으로 스타일을 만들고 구간별로 가사를 편집하세요.\n- **글쓰기 도우미.** 언어, 8–32줄 목표와 추가 지시를 지정할 수 있습니다.\n- **곡 양식.** 목소리와 템포, 구간·행·연 작업, 대소문자 도구를 추가했습니다. Keep/Words 는 가사를 유지하고 체크포인트는 엔진의 정확한 토큰을 사용합니다.\n- **악보 계획.** 여러 개 선택할 수 있으며 반복 구간의 코드는 동기화됩니다. MIDI 는 그리드와 옥타브 설정을 제공합니다.\n- **조옮김.** 생성은 −24~+24 반음 조옮김을 지원합니다.\n- **보컬만.** 네이티브 HT-Demucs 보컬 전용 MP3 또는 32비트 WAV.\n- **LoRA 스위치.** 개별 LoRA 스위치와 −10~+10 가중치.\n\n시리즈 전체가 같은 날 3.4.0이 되었습니다: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio - 하나의 코어, 세 개의 모델."
+    },
+    "tags": [
+      "MIDI",
+      "signal"
+    ]
+  },
+  {
+    "id": "yue2-studio-3-3-0",
+    "date": "2026-09-30",
+    "title": {
+      "en": "YuE2 Studio 3.3.0",
+      "ru": "YuE2 Studio 3.3.0",
+      "zh": "YuE2 Studio 3.3.0",
+      "ja": "YuE2 Studio 3.3.0",
+      "ko": "YuE2 Studio 3.3.0"
+    },
+    "body": {
+      "en": "A cover for every track, likes that stay, stems in their place, and a journal of what an agent did.\n\n- **A cover for every track.** A track without one gets a free (CC0) photograph from Wikimedia Commons that fits its genre, mood or instruments, a pattern in one of 21 styles, or a cover generated through OpenRouter for every new track - chosen in Settings - Cover art. The picture stays the same after a restart, stems wear their song's, and it is written into the MP3, so a player shows it after the download.\n- **One window for any picture.** A track's cover, its video's background and the picture in the video's centre are chosen the same way: Commons photos by search (and clips for a background), the track's pattern in any style with Another variant, generation through OpenRouter, or a file of your own. The video editor no longer asks for a Pexels key.\n- **A like stays with the song.** Every window and a connected agent see the same likes, they survive a profile change, and Liked Songs start from the latest.\n- **Stems under their song.** A separation no longer floods the list: its parts fold under the song as “Stems · N”, a list plays its songs, and separating again asks first.\n- **Sort** any list: newest, oldest, by title or by length.\n- **The Create list shows your playlist.** Pick one in “Into playlist” and the list beside the form shows that project.\n- **Activity** in the sidebar: a log of every change an agent made and every message the studio showed.\n- **Smaller things:** song rows say when a song was made, every icon button has a name for screen readers, and a playlist changed in one window shows in the others at once.\n\nIdeas from a pull request by MRafStudio (#34 in YuE2 Studio) - thank you. The whole family moved to 3.3.0 on the same day: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Обложка у каждого трека, лайки, которые не теряются, стемы на своём месте и журнал того, что сделал агент.\n\n- **Обложка у каждого трека.** Трек без своей обложки получает бесплатное фото (CC0) с Wikimedia Commons под его жанр, настроение или инструменты, узор в одном из 21 стиля или обложку, сгенерированную через OpenRouter для каждого нового трека, - выбирается в «Настройки - Обложки». Картинка не меняется после перезапуска, стемы носят обложку своей песни, и она записывается в MP3 - плеер покажет её после скачивания.\n- **Одно окно для любой картинки.** Обложка трека, фон его видео и картинка в центре выбираются одинаково: поиск фото на Commons (а для фона - и роликов), узор трека в любом стиле с кнопкой «Другой вариант», генерация через OpenRouter или свой файл. Видеоредактору больше не нужен ключ Pexels.\n- **Лайк живёт в песне.** Все окна и подключённый агент видят одни и те же лайки, они переживают смену профиля, а «Понравившиеся песни» начинаются с последнего.\n- **Стемы под своей песней.** Разделение больше не засыпает список: части сворачиваются под песней в «Стемы · N», список играет песни, а повторное разделение сначала спрашивает.\n- **Сортировка** любого списка: новые, старые, по названию или по длине.\n- **Список «Создать» показывает ваш плейлист.** Выберите его в «В плейлист» - и рядом с формой будет этот проект.\n- **Журнал** в боковой панели: лог всех изменений, сделанных агентом, и всех сообщений студии.\n- **По мелочи:** у песен видно, когда они сделаны, у всех кнопок-иконок есть подписи для экранного диктора, а плейлист, изменённый в одном окне, сразу виден в других.\n\nИдеи - из пулл-реквеста MRafStudio (#34 в YuE2 Studio), спасибо. Вся семья перешла на 3.3.0 в один день: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "每首曲目都有封面，喜欢不再丢失，分轨各归其位，还有记录代理所做操作的动态。\n\n- **每首曲目都有封面。** 没有封面的曲目会得到符合其流派、情绪或乐器的 Wikimedia Commons 免费（CC0）照片、21 种样式之一的图案，或为每首新曲目通过 OpenRouter 生成的封面（在“设置 - 封面”中选择）。重启后不会改变，分轨沿用原曲的封面，并写入 MP3，下载后播放器也能显示。\n- **一个窗口选任何图片。** 曲目封面、视频背景和视频中间的图片都用同样的方式选择：搜索 Commons 照片（背景还可用视频）、任意样式的曲目图案并可“换一个”、通过 OpenRouter 生成，或使用自己的文件。视频编辑器不再需要 Pexels 密钥。\n- **喜欢随歌曲保存。** 所有窗口和已连接的代理看到同样的喜欢，更换配置也不会丢失，“喜欢的歌曲”从最近的一首开始。\n- **分轨归在原曲之下。** 分离不再塞满列表：分轨折叠在原曲下的“分轨 · N”中，列表只播放歌曲，再次分离前会先询问。\n- **排序**任意列表：最新、最早、按标题或按时长。\n- **创作页的列表显示你的播放列表。** 在“放入歌单”中选择一个，表单旁的列表就会显示这个项目。\n- 侧边栏中的**动态**：记录代理所做的每项更改和工作室显示的每条消息。\n- **细节：** 歌曲行显示创作时间，所有图标按钮都有供读屏软件使用的名称，在一个窗口中修改的播放列表会立即出现在其他窗口中。\n\n这些想法来自 MRafStudio 的拉取请求（YuE2 Studio 的 #34），感谢。整个系列在同一天升级到 3.3.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一个核心，三个模型，链接见下方。",
+      "ja": "すべての曲にジャケット、消えないいいね、あるべき場所に収まるステム、そしてエージェントの操作を記録するアクティビティ。\n\n- **すべての曲にジャケット。** ジャケットのない曲には、ジャンル・ムード・楽器に合う Wikimedia Commons の無料（CC0）写真、21 種類のスタイルの模様、または新しい曲ごとに OpenRouter で生成するジャケットが付きます（設定 - ジャケット で選択）。再起動しても変わらず、ステムは元の曲のジャケットを使い、MP3 にも書き込まれるのでダウンロード後もプレーヤーに表示されます。\n- **どの画像もひとつのウィンドウで。** 曲のジャケット、動画の背景、動画の中央の画像を同じ方法で選べます：Commons の写真検索（背景には動画も）、「別のバリエーション」付きで好きなスタイルの模様、OpenRouter での生成、または手持ちのファイル。動画エディターに Pexels のキーはもう要りません。\n- **いいねは曲と一緒に保存。** すべてのウィンドウと接続中のエージェントが同じいいねを見られ、プロフィールを変えても消えず、「いいねした曲」は最新のものから並びます。\n- **ステムは元の曲の下に。** 分離しても一覧があふれません。パートは曲の下の「ステム · N」にまとまり、一覧は曲だけを再生し、もう一度分離するときは先に確認します。\n- どの一覧も**並べ替え**：新しい順、古い順、タイトル順、長さ順。\n- **作成ページの一覧があなたのプレイリストを表示。** 「プレイリストへ」で選ぶと、フォームの横の一覧がそのプロジェクトになります。\n- サイドバーの**アクティビティ**：エージェントによる変更とスタジオのメッセージをすべて記録します。\n- **細かな改善：** 曲の行に作成日時を表示、すべてのアイコンボタンにスクリーンリーダー用の名前、あるウィンドウで変えたプレイリストはほかのウィンドウにもすぐ反映されます。\n\nアイデアは MRafStudio さんのプルリクエスト（YuE2 Studio の #34）から。ありがとうございます。シリーズ全体が同じ日に 3.3.0 になりました：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio ― ひとつのコア、三つのモデル。リンクは下にあります。",
+      "ko": "모든 트랙에 커버, 사라지지 않는 좋아요, 제자리를 찾은 스템, 그리고 에이전트가 한 일을 남기는 활동 기록.\n\n- **모든 트랙에 커버.** 커버가 없는 트랙은 장르·분위기·악기에 맞는 Wikimedia Commons의 무료(CC0) 사진, 21가지 스타일의 무늬, 또는 새 트랙마다 OpenRouter로 생성한 커버를 받습니다(설정 - 커버에서 선택). 다시 시작해도 바뀌지 않고, 스템은 원곡의 커버를 쓰며, MP3에도 기록되어 내려받은 뒤에도 플레이어에 보입니다.\n- **어떤 그림이든 한 창에서.** 트랙 커버, 영상 배경, 영상 가운데 그림을 같은 방식으로 고릅니다: Commons 사진 검색(배경에는 영상도), '다른 변형'이 있는 원하는 스타일의 무늬, OpenRouter 생성, 또는 내 파일. 비디오 편집기에 더 이상 Pexels 키가 필요 없습니다.\n- **좋아요는 곡과 함께 저장됩니다.** 모든 창과 연결된 에이전트가 같은 좋아요를 보고, 프로필을 바꿔도 사라지지 않으며, '좋아하는 곡'은 가장 최근 것부터 보여 줍니다.\n- **스템은 원곡 아래에.** 분리해도 목록이 넘치지 않습니다. 파트는 곡 아래 '스템 · N'으로 접히고, 목록은 곡만 재생하며, 다시 분리할 때는 먼저 확인합니다.\n- 어떤 목록이든 **정렬**: 최신순, 오래된순, 제목순, 길이순.\n- **만들기 페이지의 목록이 내 재생목록을 보여 줍니다.** '플레이리스트에'에서 고르면 양식 옆 목록이 그 프로젝트가 됩니다.\n- 사이드바의 **활동**: 에이전트가 한 모든 변경과 스튜디오가 보여 준 모든 메시지를 기록합니다.\n- **작은 개선:** 곡 행에 만든 시간이 표시되고, 모든 아이콘 버튼에 스크린 리더용 이름이 있으며, 한 창에서 바꾼 재생목록이 다른 창에도 바로 보입니다.\n\n아이디어는 MRafStudio의 풀 리퀘스트(YuE2 Studio #34)에서 왔습니다. 감사합니다. 시리즈 전체가 같은 날 3.3.0이 되었습니다: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio - 하나의 코어, 세 개의 모델, 링크는 아래에 있습니다."
+    },
+    "tags": [
+      "YuE2",
+      "3.3.0"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-2-0",
+    "date": "2026-09-30",
+    "title": {
+      "en": "YuE2 Studio 3.2.0",
+      "ru": "YuE2 Studio 3.2.0",
+      "zh": "YuE2 Studio 3.2.0",
+      "ja": "YuE2 Studio 3.2.0",
+      "ko": "YuE2 Studio 3.2.0"
+    },
+    "body": {
+      "en": "AMD and Intel cards, one page for everything the studio runs, and a library that stays still.\n\n- **One page for all the models.** Settings - Models lists everything the studio downloads and runs - the engine sets, the assistant, stems, karaoke, training, style by ear and Audio to MIDI - with a table of what runs where on NVIDIA, AMD and Intel cards and on the processor.\n- **AMD and Intel cards.** The writing assistant runs through Vulkan, karaoke timing and the tempo through DirectML; training stays on NVIDIA and is no longer offered where it cannot run.\n- **A library that stays still.** A song that finishes takes its card's place instead of jumping, Play works on it while other songs are still being made, and progress comes straight from the engine.\n- **Without stopping by a slide**, so a stray click no longer starts it, and **New playlist…** right in the Create form.\n- **Max duration is remembered**, and **Take as they are** is on the train step too, for studios without an assistant.\n- **Fixes:** the trainer starts on any processor, tags and lyric files in Chinese and Cyrillic code pages read correctly, settings are no longer transparent on Windows 7 and 8.1, and the writing assistant keeps what you wrote.\n\nThe whole family moved to 3.2.0 on the same day: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Карты AMD и Intel, одна страница для всего, что запускает студия, и библиотека, которая не скачет.\n\n- **Одна страница для всех моделей.** Настройки - Модели показывают всё, что студия скачивает и запускает: наборы моделей, ассистент, стемы, караоке, обучение, стиль на слух и аудио в MIDI - с таблицей, что на чём считает на картах NVIDIA, AMD и Intel и на процессоре.\n- **Карты AMD и Intel.** Ассистент работает через Vulkan, разметка караоке и темп - через DirectML; обучение остаётся на NVIDIA и больше не предлагается там, где не заработает.\n- **Библиотека не скачет.** Готовая песня встаёт на место своей карточки, её можно включить, пока делаются другие, а прогресс приходит прямо от движка.\n- **«Без остановки» включается протяжкой**, случайный клик его больше не запускает, а **«Новый плейлист…»** есть прямо в форме «Создать».\n- **Макс. длительность запоминается**, а **«Взять как есть»** есть и на шаге обучения - для студий без ассистента.\n- **Исправлено:** тренер запускается на любом процессоре, теги и тексты в китайской и кириллической кодировках читаются правильно, настройки больше не прозрачные на Windows 7 и 8.1, а ассистент держится за то, что вы написали.\n\nВсё семейство перешло на 3.2.0 в один день: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "支持 AMD 和 Intel 显卡，一个页面管理工作室运行的一切，曲库不再跳动。\n\n- **一个页面管理所有模型。** 设置 - 模型列出工作室下载和运行的一切——模型组、写作助手、分轨、卡拉 OK、训练、听歌识风格和音频转 MIDI——并附一张表，说明在 NVIDIA、AMD、Intel 显卡和处理器上各部分用什么运行。\n- **AMD 和 Intel 显卡。** 写作助手通过 Vulkan 运行，卡拉 OK 对时和速度检测通过 DirectML 运行；训练仍只在 NVIDIA 上进行，在无法运行的电脑上不再提供。\n- **曲库不再跳动。** 生成完成的歌曲直接占据其卡片的位置，其他歌曲还在生成时也能播放，进度直接来自引擎。\n- **「不停生成」需滑动开启**，误点不会再启动它；「创建」表单里可直接「新建歌单…」。\n- **「最长时长」会被记住**；没有写作助手时，训练步骤也有「按原样使用」。\n- **修复：** 训练器可在任何处理器上启动；中文和西里尔编码的标签与歌词文件读取正确；Windows 7 和 8.1 上设置不再透明；写作助手会保留你写的内容。\n\n整个工作室家族在同一天升级到 3.2.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一内核，三个模型，链接见下方。",
+      "ja": "AMD・Intel の GPU に対応、スタジオが動かすものを 1 ページに集約、ライブラリが跳ねなくなりました。\n\n- **すべてのモデルを 1 ページに。** 設定 - モデルに、スタジオがダウンロードして動かすもの（モデルのセット、作詞アシスタント、ステム、カラオケ、学習、耳でスタイル、オーディオ→MIDI）がまとまり、NVIDIA・AMD・Intel の GPU とプロセッサで何が動くかの表も付きます。\n- **AMD と Intel の GPU。** 作詞アシスタントは Vulkan、カラオケのタイミングとテンポは DirectML で動きます。学習は NVIDIA のみで、動かない環境では表示しません。\n- **跳ねないライブラリ。** 完成した曲はカードの位置にそのまま入り、ほかの曲を作っている間も再生でき、進捗はエンジンから直接届きます。\n- **「止めずに生成」はスライドでオン**になり、誤クリックでは始まりません。「作成」フォームから「新しいプレイリスト…」も作れます。\n- **「最大の長さ」を記憶**し、アシスタントがなくても学習ステップで「そのまま使う」を選べます。\n- **修正：** トレーナーがどのプロセッサでも起動し、中国語やキリル文字のコードページのタグと歌詞ファイルを正しく読み、Windows 7 と 8.1 で設定が透明にならず、アシスタントが書いた内容を守ります。\n\nスタジオファミリー全体が同じ日に 3.2.0 になりました：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio。同じコア、3 つのモデル。リンクは下にあります。",
+      "ko": "AMD·Intel 그래픽카드 지원, 스튜디오가 실행하는 모든 것을 한 페이지에, 흔들리지 않는 라이브러리.\n\n- **모든 모델을 한 페이지에.** 설정 - 모델에서 스튜디오가 내려받고 실행하는 모든 것(모델 세트, 작사 도우미, 스템, 가라오케, 학습, 귀로 듣는 스타일, 오디오→MIDI)을 관리하고, NVIDIA·AMD·Intel 그래픽카드와 프로세서에서 무엇이 어디서 돌아가는지 표로 보여 줍니다.\n- **AMD와 Intel 그래픽카드.** 작사 도우미는 Vulkan으로, 가라오케 타이밍과 템포는 DirectML로 돌아갑니다. 학습은 NVIDIA에서만 되며, 돌아가지 않는 컴퓨터에서는 더 이상 제안하지 않습니다.\n- **흔들리지 않는 라이브러리.** 완성된 곡은 카드 자리를 그대로 이어받고, 다른 곡을 만드는 동안에도 재생할 수 있으며, 진행 상황은 엔진에서 바로 옵니다.\n- **'멈추지 않고 생성'은 밀어서 켭니다.** 실수로 누르면 켜지지 않습니다. '만들기' 양식에서 '새 플레이리스트…'도 바로 만들 수 있습니다.\n- **'최대 길이'를 기억**하고, 도우미가 없어도 학습 단계에서 '그대로 사용'을 쓸 수 있습니다.\n- **수정:** 트레이너가 어떤 프로세서에서도 시작되고, 중국어·키릴 문자 코드 페이지의 태그와 가사 파일을 올바르게 읽으며, Windows 7과 8.1에서 설정이 투명하지 않고, 도우미가 쓴 내용을 지킵니다.\n\n스튜디오 패밀리 전체가 같은 날 3.2.0으로 올라갔습니다: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio — 하나의 코어, 세 개의 모델, 링크는 아래에 있습니다."
+    },
+    "tags": [
+      "YuE2",
+      "3.2.0",
+      "AMD",
+      "Intel"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-1-0",
+    "date": "2026-09-29",
+    "title": {
+      "en": "YuE2 Studio 3.1.0",
+      "ru": "YuE2 Studio 3.1.0",
+      "zh": "YuE2 Studio 3.1.0",
+      "ja": "YuE2 Studio 3.1.0",
+      "ko": "YuE2 Studio 3.1.0"
+    },
+    "body": {
+      "en": "Access from anywhere, the card of your choice and LoRA for ComfyUI.\n\n- **The studio from another computer.** Settings - Appearance - Access from the network: the studio opens in a browser on your phone or laptop, with an access key.\n- **The card to compute on.** With two or more NVIDIA cards, Settings - Engine picks the one the engine, the trainer and the assistant use.\n- **LoRA for ComfyUI.** A trained LoRA is saved as one file that ComfyUI's stock loader takes.\n- **Without stopping and bigger queues.** More than ten songs at once, a form that keeps making songs, new songs straight into a playlist.\n- **Stems of any track**, imported ones too; **stop after this track**; player buttons in the sidebar can be hidden.\n- **A switch for the stock photo** of a track without a cover, on by default.\n- **Older cards**: GTX 900 and 10-series and older drivers get a CUDA 12 build; AIFF and ALAC are read everywhere.\n- **Everything updated**: the engines, llama.cpp, HOT-Step, Tauri, React, Vite 8, Tailwind 4, TypeScript 7 and the Rust crates on their current majors.\n\n**Also in YuE2 Studio:** LoRA training now follows HOT-Step's base-matched recipe - Fast, Balanced and Thorough, with the old recipe kept as a preset; listen to the score and save it as MIDI; a cover's style by ear; seven more LoRA in the catalogue.\n\nThe whole family moved to 3.1.0 on the same day: YuE2 Studio, MiniMax Music3 Studio and ACE-Step Studio - one core, three models, the links below.",
+      "ru": "Доступ отовсюду, своя видеокарта и LoRA для ComfyUI.\n\n- **Студия с другого компьютера.** Настройки - Внешний вид - Доступ из сети: студия открывается в браузере телефона или ноутбука, по ключу доступа.\n- **Выбор видеокарты.** Если NVIDIA две и больше, в Настройки - Движок выбирается карта для движка, тренера и ассистента.\n- **LoRA для ComfyUI.** Обученная LoRA сохраняется одним файлом, который берёт штатный загрузчик ComfyUI.\n- **Без остановки и большие очереди.** Больше десяти песен разом, форма, которая делает песни сама, новые песни сразу в плейлист.\n- **Стемы любого трека**, и импортированного тоже; **стоп после этого трека**; кнопки плеера в боковой панели можно скрыть.\n- **Переключатель стокового фото** для трека без обложки, по умолчанию включён.\n- **Старые карты**: для GTX 900 и 10-й серии и старых драйверов есть сборка на CUDA 12; AIFF и ALAC читаются везде.\n- **Всё обновлено**: движки, llama.cpp, HOT-Step, Tauri, React, Vite 8, Tailwind 4, TypeScript 7 и Rust-крейты на текущих мажорах.\n\n**Ещё в YuE2 Studio:** обучение LoRA теперь идёт по рецепту base-matched из HOT-Step - Быстро, Сбалансированно и Тщательно, старый рецепт остался пресетом; партитуру можно послушать и сохранить в MIDI; стиль кавера на слух; ещё семь LoRA в каталоге.\n\nВсё семейство перешло на 3.1.0 в один день: YuE2 Studio, MiniMax Music3 Studio и ACE-Step Studio - одно ядро, три модели, ссылки ниже.",
+      "zh": "随处访问、自选显卡，以及用于 ComfyUI 的 LoRA。\n\n- **从另一台电脑使用工作室。** 设置 - 外观 - 网络访问：在手机或笔记本的浏览器中打开工作室，凭访问密钥进入。\n- **选择显卡。** 有两块及以上 NVIDIA 显卡时，在 设置 - 引擎 中选择引擎、训练器和助手使用的显卡。\n- **用于 ComfyUI 的 LoRA。** 训练好的 LoRA 保存为单个文件，ComfyUI 自带的加载器即可读取。\n- **不停歇与更大的队列。** 一次超过十首歌，表单可持续自动生成，新歌直接进入播放列表。\n- **任意曲目的分轨**，导入的也可以；**播完本曲后停止**；侧栏的播放器按钮可以隐藏。\n- **无封面曲目的图库照片开关**，默认开启。\n- **旧显卡**：GTX 900、10 系列和较旧驱动使用 CUDA 12 版本；AIFF 和 ALAC 处处可读。\n- **全面更新**：引擎、llama.cpp、HOT-Step、Tauri、React、Vite 8、Tailwind 4、TypeScript 7 以及最新大版本的 Rust crate。\n\n**YuE2 Studio 另外：**LoRA 训练改用 HOT-Step 的 base-matched 配方——快速、均衡、细致三档，旧配方保留为预设；乐谱可试听并保存为 MIDI；按听感描述翻唱风格；目录新增七个 LoRA。\n\n整个家族在同一天升级到 3.1.0：YuE2 Studio、MiniMax Music3 Studio 和 ACE-Step Studio——同一核心、三个模型，链接见下。",
+      "ja": "どこからでもアクセス、選べるカード、ComfyUI 用 LoRA。\n\n- **別のコンピューターからスタジオを。** 設定 - 外観 - ネットワークからのアクセス：スマホやノート PC のブラウザでアクセスキーを使って開けます。\n- **計算に使うカード。** NVIDIA が 2 枚以上あれば、設定 - エンジン でエンジン、トレーナー、アシスタントが使うカードを選べます。\n- **ComfyUI 用 LoRA。** 学習した LoRA を ComfyUI 標準のローダーで読める 1 ファイルとして保存します。\n- **止まらずに、より大きなキュー。** 一度に 10 曲以上、フォームが曲を作り続け、新しい曲はそのままプレイリストへ。\n- **どのトラックもステム分離**、インポートした曲も；**この曲の後で停止**；サイドバーのプレーヤーボタンは非表示にできます。\n- **カバーのない曲のストック写真スイッチ**、既定でオン。\n- **古いカード**：GTX 900・10 シリーズと古いドライバー向けに CUDA 12 ビルド；AIFF と ALAC はどこでも読めます。\n- **すべて更新**：エンジン、llama.cpp、HOT-Step、Tauri、React、Vite 8、Tailwind 4、TypeScript 7、最新メジャーの Rust クレート。\n\n**YuE2 Studio ではさらに：**LoRA 学習は HOT-Step の base-matched レシピに——高速・バランス・丁寧の 3 段階、旧レシピはプリセットとして残ります；楽譜を試聴して MIDI で保存；耳で聴いてカバーのスタイルを記述；カタログに LoRA が 7 つ追加。\n\nファミリー全体が同じ日に 3.1.0 に：YuE2 Studio、MiniMax Music3 Studio、ACE-Step Studio——ひとつのコア、3 つのモデル。リンクは下に。",
+      "ko": "어디서나 접속, 원하는 카드, ComfyUI용 LoRA.\n\n- **다른 컴퓨터에서 스튜디오를.** 설정 - 모양 - 네트워크에서 접속: 휴대폰이나 노트북 브라우저에서 접근 키로 스튜디오를 엽니다.\n- **계산에 쓸 카드.** NVIDIA 카드가 두 장 이상이면 설정 - 엔진에서 엔진, 트레이너, 어시스턴트가 쓸 카드를 고릅니다.\n- **ComfyUI용 LoRA.** 학습한 LoRA를 ComfyUI 기본 로더가 읽는 파일 하나로 저장합니다.\n- **멈추지 않고, 더 큰 대기열.** 한 번에 열 곡 이상, 계속 곡을 만드는 폼, 새 곡은 바로 플레이리스트로.\n- **어떤 트랙이든 스템 분리**, 가져온 곡도; **이 트랙 후 정지**; 사이드바의 플레이어 버튼은 숨길 수 있습니다.\n- **커버 없는 트랙의 스톡 사진 스위치**, 기본값은 켜짐.\n- **오래된 카드**: GTX 900·10 시리즈와 오래된 드라이버용 CUDA 12 빌드; AIFF와 ALAC을 어디서나 읽습니다.\n- **모두 업데이트**: 엔진, llama.cpp, HOT-Step, Tauri, React, Vite 8, Tailwind 4, TypeScript 7, 최신 메이저의 Rust 크레이트.\n\n**YuE2 Studio에서는 또:** LoRA 학습이 HOT-Step의 base-matched 레시피로 — 빠르게·균형·꼼꼼히 세 단계, 이전 레시피는 프리셋으로 남습니다; 악보를 들어 보고 MIDI로 저장; 귀로 듣고 커버 스타일 작성; 카탈로그에 LoRA 7개 추가.\n\n패밀리 전체가 같은 날 3.1.0으로: YuE2 Studio, MiniMax Music3 Studio, ACE-Step Studio — 하나의 코어, 세 가지 모델, 링크는 아래에."
+    },
+    "tags": [
+      "YuE2",
+      "3.1.0",
+      "LoRA",
+      "ComfyUI"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-3-0-0",
+    "date": "2026-09-26",
+    "title": {
+      "en": "YuE2 Studio 3.0.0",
+      "ru": "YuE2 Studio 3.0.0",
+      "zh": "YuE2 Studio 3.0.0",
+      "ja": "YuE2 Studio 3.0.0",
+      "ko": "YuE2 Studio 3.0.0"
+    },
+    "body": {
+      "en": "A player of its own, and more around it.\n\n- **Equalizer.** Ten bands on Winamp's frequencies with its presets, your own and .EQF files, balance and mono.\n- **Visualiser.** MilkDrop with hundreds of presets or a spectrum in ten looks: over the studio, fullscreen or in a window of its own.\n- **Winamp mode.** The whole window becomes a classic Winamp 2: its windows move apart, dock and resize; the original skin and ten more come in the box, sharp at any scale; the Winamp Skin Museum is one click away, and Ctrl+M switches. The song, its place, the volume and the equalizer go over and come back.\n- **Save as everywhere**, with a Files panel that shows each save.\n- **A proxy for the whole studio**: HTTP, HTTPS, SOCKS5 and SOCKS4, with a login.\n- **For agents**: all of it through MCP, from the equalizer and Winamp to today's best songs.\n- **Four review rounds** went over the code.\n\n**Also in YuE2 Studio:** covers keep the song's key and chords (SheetSage2 spelling), and a song added to a dataset brings its lyrics from its tags.\n\nThe whole family moved to 3.0.0 on the same day: YuE2 Studio (songs with an editable score), MiniMax Music3 Studio (full-length tracks) and ACE-Step Studio (Suno at home, now updated too) - one core, three models, the links below.",
+      "ru": "Свой плеер и многое вокруг него.\n\n- **Эквалайзер.** Десять полос на частотах Winamp, его пресеты, ваши и файлы .EQF, баланс и моно.\n- **Визуализатор.** MilkDrop с сотнями пресетов или спектр в десяти видах: поверх студии, на весь экран или в отдельном окне.\n- **Режим Winamp.** Всё окно становится классическим Winamp 2: его окна разъединяются, стыкуются и растягиваются; в комплекте оригинальный скин и ещё десять, чёткие на любом масштабе; музей скинов Winamp в один клик, Ctrl+M для переключения. Песня, место в ней, громкость и эквалайзер переходят туда и обратно.\n- **«Сохранить как» везде** и панель файлов, где видно каждое сохранение.\n- **Прокси на всю студию**: HTTP, HTTPS, SOCKS5 и SOCKS4, с логином.\n- **Для агентов**: всё это через MCP, от эквалайзера и Winamp до лучших песен за сегодня.\n- **Четыре круга ревью** прошёл код.\n\n**Ещё в YuE2 Studio:** каверы сохраняют тональность и аккорды песни (написание SheetSage2), а песня, добавленная в набор, приносит текст из своих тегов.\n\nВсё семейство перешло на 3.0.0 в один день: YuE2 Studio (песни с редактируемой партитурой), MiniMax Music3 Studio (полноформатные треки) и ACE-Step Studio (Suno дома - тоже обновилась): одно ядро, три модели, ссылки ниже.",
+      "zh": "自带播放器，以及围绕它的更多功能。\n\n- **均衡器。** 基于 Winamp 频率的十段均衡，含其预设、你自己的预设和 .EQF 文件，以及平衡和单声道。\n- **可视化。** 带数百个预设的 MilkDrop，或十种样式的频谱：悬浮在工作室上方、全屏或独立窗口。\n- **Winamp 模式。** 整个窗口变成经典的 Winamp 2：各窗口可分离、吸附和调整大小；内置原版皮肤和另外十款，任何缩放下都清晰；一键打开 Winamp 皮肤博物馆，Ctrl+M 切换。歌曲、播放位置、音量和均衡器来回同步。\n- **处处可“另存为”**，文件面板显示每次保存。\n- **整个工作室可走代理**：HTTP、HTTPS、SOCKS5 和 SOCKS4，支持登录。\n- **面向智能体**：这一切都可通过 MCP 控制，从均衡器、Winamp 到今天最好的歌。\n- **四轮审查**覆盖了代码。\n\n**YuE2 Studio 另外：**翻唱保留歌曲的调性与和弦（SheetSage2 写法），加入数据集的歌曲会从标签带入歌词。\n\n整个家族在同一天升级到 3.0.0：YuE2 Studio（带可编辑乐谱的歌曲）、MiniMax Music3 Studio（完整长度曲目）和 ACE-Step Studio（家里的 Suno，也已更新）——同一核心、三个模型，链接见下。",
+      "ja": "専用プレーヤーと、その周りのあれこれ。\n\n- **イコライザー。** Winamp の周波数による 10 バンド、プリセット、自作プリセット、.EQF ファイル、バランスとモノ。\n- **ビジュアライザー。** 数百のプリセットを持つ MilkDrop、または 10 種類のスペクトラム。スタジオの上、全画面、別ウィンドウで。\n- **Winamp モード。** ウィンドウ全体がクラシックな Winamp 2 に。各ウィンドウは切り離し・ドッキング・リサイズ可能。オリジナルスキンとさらに 10 種を同梱し、どの倍率でもくっきり。Winamp スキン博物館へワンクリック、Ctrl+M で切り替え。曲、再生位置、音量、イコライザーが行き来します。\n- **どこでも「名前を付けて保存」**、保存を一覧するファイルパネル付き。\n- **スタジオ全体のプロキシ**：HTTP、HTTPS、SOCKS5、SOCKS4、ログイン対応。\n- **エージェント向け**：イコライザーや Winamp から今日のベスト曲まで、すべて MCP で操作できます。\n- **4 回のレビュー**をコードが通過しました。\n\n**YuE2 Studio ではさらに：**カバーは曲のキーとコードを保ちます（SheetSage2 の表記）。データセットに追加した曲はタグから歌詞を取り込みます。\n\nファミリー全体が同じ日に 3.0.0 に：YuE2 Studio（編集可能な楽譜付きの曲）、MiniMax Music3 Studio（フルレングス曲）、ACE-Step Studio（自宅の Suno、こちらも更新）——ひとつのコア、3 つのモデル。リンクは下に。",
+      "ko": "전용 플레이어, 그리고 그 주변의 많은 것.\n\n- **이퀄라이저.** Winamp 주파수의 10밴드, 프리셋, 내 프리셋, .EQF 파일, 밸런스와 모노.\n- **시각화.** 수백 개의 프리셋을 가진 MilkDrop 또는 열 가지 모양의 스펙트럼: 스튜디오 위, 전체 화면, 별도 창에서.\n- **Winamp 모드.** 창 전체가 클래식 Winamp 2가 됩니다. 각 창을 분리·도킹·크기 조절할 수 있고, 오리지널 스킨과 10종이 기본 포함되어 어떤 배율에서도 선명합니다. Winamp 스킨 박물관은 클릭 한 번, Ctrl+M으로 전환. 노래, 재생 위치, 볼륨, 이퀄라이저가 오갑니다.\n- **어디서나 '다른 이름으로 저장'**, 저장을 보여 주는 파일 패널.\n- **스튜디오 전체 프록시**: HTTP, HTTPS, SOCKS5, SOCKS4, 로그인 지원.\n- **에이전트용**: 이퀄라이저와 Winamp부터 오늘의 베스트 곡까지 모두 MCP로 제어합니다.\n- **네 번의 리뷰**를 코드가 거쳤습니다.\n\n**YuE2 Studio에서는 또:** 커버가 노래의 조성과 코드를 유지하고(SheetSage2 표기), 데이터셋에 추가한 곡은 태그에서 가사를 가져옵니다.\n\n패밀리 전체가 같은 날 3.0.0으로: YuE2 Studio(편집 가능한 악보가 있는 노래), MiniMax Music3 Studio(풀렝스 트랙), ACE-Step Studio(집에서 쓰는 Suno, 역시 업데이트) — 하나의 코어, 세 가지 모델, 링크는 아래에."
+    },
+    "tags": [
+      "YuE2",
+      "3.0.0",
+      "Winamp",
+      "MilkDrop"
+    ],
+    "links": [
+      {
+        "label": "YuE2 Studio",
+        "url": "https://timoncool.github.io/YuE2-Studio/"
+      },
+      {
+        "label": "MiniMax Music3 Studio",
+        "url": "https://timoncool.github.io/MiniMax-Music3-Studio/"
+      },
+      {
+        "label": "ACE-Step Studio",
+        "url": "https://timoncool.github.io/ACE-Step-Studio/"
+      }
+    ]
+  },
+  {
+    "id": "yue2-studio-2-1-0",
+    "date": "2026-09-25",
+    "title": {
+      "en": "YuE2 Studio 2.1.0",
+      "ru": "YuE2 Studio 2.1.0",
+      "zh": "YuE2 Studio 2.1.0",
+      "ja": "YuE2 Studio 2.1.0",
+      "ko": "YuE2 Studio 2.1.0"
+    },
+    "body": {
+      "en": "Train a LoRA further: a run that is not there yet goes on from its latest checkpoint - set the steps to reach and press Train further; the same recipe and songs, the loss chart and the checkpoints continue instead of starting over. Section tags for your own lyrics with one button, the words exactly as you wrote them. And fixes from your comments: renaming a track works from the song details and the library, Use models I already have finds models in subfolders, the form says how long the audio stage is for the duration set and warns when max tokens asks for more, the song details show changed sampling, and the side panels widen up to 1200 px on large screens.",
+      "ru": "Дообучение LoRA: прогон, который ещё не дотянул, продолжается с последнего чекпоинта - задайте, до какого шага учить, и нажмите «Дообучить»; тот же рецепт и песни, график и чекпоинты идут дальше, а не заново. Теги секций для вашего текста одной кнопкой - слова остаются ровно как написаны. И исправления по вашим комментариям: трек переименовывается из деталей песни и из библиотеки, «Взять уже скачанные модели» находит модели во вложенных папках, форма показывает длину аудиостадии для заданной длительности и предупреждает, если «Макс. токенов» больше, в деталях песни видны изменённые параметры сэмплинга, боковые панели растягиваются до 1200 px на больших экранах.",
+      "zh": "继续训练 LoRA：还没达到效果的训练可以从最新检查点接着训练——设定要达到的步数并点击“继续训练”；配方和歌曲不变，损失曲线和检查点接续下去，而不是从头开始。一键为你自己的歌词加上段落标签，歌词一字不改。还有根据大家评论做的修复：可以在歌曲详情和曲库中重命名音轨，“使用已下载的模型”能找到子文件夹中的模型，表单会显示当前时长对应的音频阶段长度，并在最大 token 数超出时提醒，歌曲详情显示修改过的采样参数，侧边栏在大屏上可加宽到 1200 像素。",
+      "ja": "LoRA の追加学習：まだ仕上がっていない学習を最新のチェックポイントから続けられます。目標ステップを設定して「追加で学習」を押すだけで、同じレシピと曲のまま、損失グラフとチェックポイントが最初からではなく続きから進みます。自分で書いた歌詞にワンクリックでセクションタグを付けられ、言葉はそのまま残ります。皆さんのコメントからの修正も：曲の詳細とライブラリからトラック名を変更でき、「ダウンロード済みのモデルを使う」がサブフォルダーのモデルも見つけ、フォームは設定した長さでのオーディオ段階の長さを示して最大トークンが超えると警告し、曲の詳細に変更したサンプリングが表示され、サイドパネルは大きな画面で 1200 px まで広げられます。",
+      "ko": "LoRA 이어서 학습: 아직 부족한 학습을 최신 체크포인트부터 이어 갈 수 있습니다. 목표 스텝을 정하고 「이어서 학습」을 누르면 같은 레시피와 곡으로, 손실 그래프와 체크포인트가 처음부터가 아니라 이어서 진행됩니다. 직접 쓴 가사에 버튼 하나로 섹션 태그를 달 수 있고, 가사는 쓴 그대로 남습니다. 여러분의 댓글로 고친 것들도 있습니다: 곡 상세와 라이브러리에서 트랙 이름을 바꿀 수 있고, 「이미 받은 모델 사용」이 하위 폴더의 모델도 찾으며, 입력 폼이 설정한 길이에 맞는 오디오 단계 길이를 보여 주고 최대 토큰이 넘치면 경고하고, 곡 상세에 바꾼 샘플링이 표시되며, 사이드 패널은 큰 화면에서 1200px까지 넓어집니다."
+    },
+    "tags": [
+      "YuE2",
+      "2.1.0",
+      "LoRA"
+    ]
+  },
+  {
+    "id": "yue2-studio-2-0-0",
+    "date": "2026-09-25",
+    "title": {
+      "en": "YuE2 Studio 2.0.0",
+      "ru": "YuE2 Studio 2.0.0",
+      "zh": "YuE2 Studio 2.0.0",
+      "ja": "YuE2 Studio 2.0.0",
+      "ko": "YuE2 Studio 2.0.0"
+    },
+    "body": {
+      "en": "Two big things. The studio now has an MCP server: an agent such as Claude Code connects to http://127.0.0.1:8791/mcp and does everything the studio does - songs, scores, the library, stems, karaoke, video clips, LoRA training from a folder of songs - and sees and works the window itself; pick Agent (MCP) as the writing assistant and the agent writes instead of the small local model. And any track becomes MIDI: a song, a stem or a processed take turns into multi-instrument MIDI on the GPU, with a piano roll that fills in as it listens and playback against the original; it downloads the first time you use it. Tracks made by tools - stems, processing, re-renders, covers - are now tracks of the library linked to their original.",
+      "ru": "Два больших изменения. В студии появился MCP-сервер: агент вроде Claude Code подключается к http://127.0.0.1:8791/mcp и делает всё, что умеет студия, - песни, партитуры, библиотеку, стемы, караоке, клипы, обучение LoRA по папке песен, - и видит окно, работая в нём как пользователь; выберите Агент (MCP) ассистентом, и тексты будет писать агент вместо маленькой локальной модели. И любой трек теперь переводится в MIDI: песня, стем или обработанная версия превращается в многодорожечный MIDI на видеокарте, пианоролл заполняется по ходу, можно слушать вместе с оригиналом; всё нужное скачивается при первом запуске. Треки, сделанные инструментами, - стемы, обработка, перерендер, каверы - теперь треки библиотеки со ссылкой на оригинал.",
+      "zh": "两项重大更新。工作室现在内置 MCP 服务器：Claude Code 等智能体连接 http://127.0.0.1:8791/mcp 后即可完成工作室的所有操作——歌曲、乐谱、曲库、分轨、卡拉 OK、视频、用一个歌曲文件夹训练 LoRA——还能像用户一样查看并操作窗口；把写作助手选为 Agent (MCP)，就由智能体代替本地小模型写词。此外，任何音轨都能转成 MIDI：歌曲、分轨或处理后的版本都可在 GPU 上转为多乐器 MIDI，钢琴卷帘随识别实时填充，并可与原曲对照播放；首次使用时自动下载。由工具生成的音轨——分轨、处理、重新渲染、翻唱——现在都是曲库中的音轨，并链接到原曲。",
+      "ja": "大きな変更が 2 つあります。スタジオに MCP サーバーが入りました。Claude Code などのエージェントが http://127.0.0.1:8791/mcp に接続すると、曲、楽譜、ライブラリ、ステム、カラオケ、動画、曲フォルダーからの LoRA 学習など、スタジオでできることをすべて行え、ウィンドウもユーザーと同じように見て操作できます。作詞アシスタントに Agent (MCP) を選ぶと、小さなローカルモデルの代わりにエージェントが書きます。さらに、どのトラックも MIDI にできるようになりました。曲、ステム、処理済みテイクを GPU でマルチ楽器の MIDI に変換し、ピアノロールが聴き取りに合わせて埋まり、原曲と重ねて再生できます。初回使用時にダウンロードされます。ツールで作ったトラック（ステム、処理、再レンダー、カバー）は、元の曲にリンクしたライブラリのトラックになりました。",
+      "ko": "큰 변화 두 가지입니다. 스튜디오에 MCP 서버가 생겼습니다. Claude Code 같은 에이전트가 http://127.0.0.1:8791/mcp 에 연결하면 노래, 악보, 라이브러리, 스템, 가라오케, 영상, 노래 폴더로 LoRA 학습까지 스튜디오가 하는 모든 일을 하고, 창을 사용자처럼 보고 조작합니다. 작사 도우미로 Agent (MCP)를 고르면 작은 로컬 모델 대신 에이전트가 씁니다. 그리고 이제 어떤 트랙이든 MIDI로 바꿀 수 있습니다. 노래, 스템, 처리된 테이크를 GPU에서 다중 악기 MIDI로 바꾸고, 피아노 롤이 듣는 대로 채워지며 원곡과 함께 재생할 수 있습니다. 처음 쓸 때 내려받습니다. 도구로 만든 트랙(스템, 처리, 재렌더, 커버)은 이제 원곡에 연결된 라이브러리 트랙입니다."
+    },
+    "tags": [
+      "YuE2",
+      "2.0.0",
+      "MCP",
+      "MIDI"
+    ]
+  },
+  {
+    "id": "yue2-studio-1-1-2",
+    "date": "2026-09-24",
+    "title": {
+      "en": "YuE2 Studio 1.1.2",
+      "ru": "YuE2 Studio 1.1.2",
+      "zh": "YuE2 Studio 1.1.2",
+      "ja": "YuE2 Studio 1.1.2",
+      "ko": "YuE2 Studio 1.1.2"
+    },
+    "body": {
+      "en": "YuE2 Studio now runs on every NVIDIA card from the GTX 900 series on. It ships two CUDA builds of the engine with compiled code for every architecture and picks the one your card and driver run: CUDA 13 for Turing and newer (GTX 16, RTX 20–50, T4, A100, RTX A-series, L4/L40, H100), CUDA 12 for Maxwell, Pascal and Volta (GTX 900/1000, Titan, Tesla M40/P40/P100/V100) and for older drivers. The error \"PTX was compiled with an unsupported toolchain\" is gone. The engine's cache is now sized to the song, about 1.5 GB for 130 seconds instead of 5.4 GB, so a 6 GB card has room; the audio is the same to the byte.",
+      "ru": "YuE2 Studio теперь работает на любой NVIDIA начиная с GTX 900. В студии две сборки движка с готовым кодом под каждую архитектуру, и она сама выбирает ту, что тянут карта и драйвер: CUDA 13 для Turing и новее (GTX 16, RTX 20–50, T4, A100, RTX A-серия, L4/L40, H100), CUDA 12 для Maxwell, Pascal и Volta (GTX 900/1000, Titan, Tesla M40/P40/P100/V100) и для старых драйверов. Ошибки «PTX was compiled with an unsupported toolchain» больше нет. Кэш движка теперь по длине песни, около 1.5 ГБ на 130 секунд вместо 5.4 ГБ, так что карте на 6 ГБ хватает места; звук тот же до байта.",
+      "zh": "YuE2 Studio 现在可在 GTX 900 系列及以后的所有 NVIDIA 显卡上运行。工作室内置两套 CUDA 引擎，为每种架构都带有编译好的代码，并自动选择显卡和驱动能运行的那一套：CUDA 13 用于 Turing 及更新架构（GTX 16、RTX 20–50、T4、A100、RTX A 系列、L4/L40、H100），CUDA 12 用于 Maxwell、Pascal 和 Volta（GTX 900/1000、Titan、Tesla M40/P40/P100/V100）以及较旧的驱动。“PTX was compiled with an unsupported toolchain”错误不再出现。引擎缓存现在按歌曲长度分配，130 秒约 1.5 GB，而不是 5.4 GB，6 GB 显卡也够用；音频逐字节一致。",
+      "ja": "YuE2 Studio が GTX 900 シリーズ以降のすべての NVIDIA カードで動くようになりました。各アーキテクチャ向けのコンパイル済みコードを持つ 2 つの CUDA ビルドを同梱し、カードとドライバーに合う方を自動で選びます。CUDA 13 は Turing 以降（GTX 16、RTX 20–50、T4、A100、RTX A シリーズ、L4/L40、H100）、CUDA 12 は Maxwell・Pascal・Volta（GTX 900/1000、Titan、Tesla M40/P40/P100/V100）と古いドライバー向けです。「PTX was compiled with an unsupported toolchain」エラーはなくなりました。エンジンのキャッシュは曲の長さに合わせて確保され、130 秒で 5.4 GB ではなく約 1.5 GB になったため、6 GB のカードでも余裕があります。音声はバイト単位で同じです。",
+      "ko": "YuE2 Studio가 이제 GTX 900 시리즈 이후의 모든 NVIDIA 카드에서 작동합니다. 아키텍처마다 컴파일된 코드를 담은 두 가지 CUDA 엔진 빌드를 포함하고, 카드와 드라이버가 실행할 수 있는 쪽을 자동으로 고릅니다. CUDA 13은 Turing 이상(GTX 16, RTX 20–50, T4, A100, RTX A 시리즈, L4/L40, H100), CUDA 12는 Maxwell·Pascal·Volta(GTX 900/1000, Titan, Tesla M40/P40/P100/V100)와 오래된 드라이버용입니다. \"PTX was compiled with an unsupported toolchain\" 오류가 더 이상 나지 않습니다. 엔진 캐시는 이제 곡 길이에 맞춰 잡혀 130초에 5.4 GB 대신 약 1.5 GB를 쓰므로 6 GB 카드에도 여유가 있습니다. 오디오는 바이트 단위로 같습니다."
+    },
+    "tags": [
+      "YuE2",
+      "1.1.2"
+    ]
+  },
+  {
+    "id": "yue2-studio-1-1-1",
+    "date": "2026-09-24",
+    "title": {
+      "en": "YuE2 Studio 1.1.1",
+      "ru": "YuE2 Studio 1.1.1",
+      "zh": "YuE2 Studio 1.1.1",
+      "ja": "YuE2 Studio 1.1.1",
+      "ko": "YuE2 Studio 1.1.1"
+    },
+    "body": {
+      "en": "The create page no longer resets when you open the library or another page: the style, lyrics, score and settings stay as you left them. Songs play again after the studio folder moves or its drive gets another letter: they are found by name in the media folder. Separation, karaoke and cover errors now show their cause. The LoRA catalogue can select everything not downloaded yet in one click.",
+      "ru": "Страница «Создать» больше не сбрасывается при переходе в библиотеку или на другую вкладку: стиль, текст, партитура и настройки остаются на месте. Песни снова играют, если папка студии переехала или диск после перезагрузки получил другую букву: студия находит их по имени в папке media. Ошибки разделения на дорожки, караоке и обложек теперь показывают причину целиком. В каталоге LoRA можно одной кнопкой выбрать всё, что ещё не скачано.",
+      "zh": "切换到曲库或其他页面时，“创建”页不再重置：风格、歌词、乐谱和设置都会保留。工作室文件夹移动或磁盘盘符变化后，歌曲可以再次播放：会在 media 文件夹中按文件名找到。分轨、卡拉OK和封面的错误现在会显示完整原因。LoRA 目录可一键选择所有尚未下载的项目。",
+      "ja": "ライブラリなど他のページに移動しても「作成」ページがリセットされなくなりました。スタイル、歌詞、楽譜、設定はそのまま残ります。スタジオのフォルダーを移動したり、再起動でドライブ文字が変わっても曲が再生できるようになりました（media フォルダー内で名前で見つけます）。ステム分離・カラオケ・カバーのエラーは原因まで表示されます。LoRA カタログで未ダウンロードのものをワンクリックで全選択できます。",
+      "ko": "라이브러리나 다른 페이지로 이동해도 「만들기」 페이지가 초기화되지 않습니다. 스타일, 가사, 악보, 설정이 그대로 남습니다. 스튜디오 폴더를 옮기거나 재부팅 후 드라이브 문자가 바뀌어도 곡이 다시 재생됩니다. media 폴더에서 이름으로 찾습니다. 스템 분리, 가라오케, 커버 오류는 이제 원인까지 표시합니다. LoRA 카탈로그에서 아직 받지 않은 항목을 한 번에 모두 선택할 수 있습니다."
+    },
+    "tags": [
+      "YuE2",
+      "1.1.1"
+    ]
+  },
+  {
+    "id": "yue2-studio-1-1",
+    "date": "2026-09-24",
+    "title": {
+      "en": "YuE2 Studio 1.1: LoRA, training and sound processing",
+      "ru": "YuE2 Studio 1.1: LoRA, обучение и обработка звука",
+      "zh": "YuE2 Studio 1.1：LoRA、训练与声音处理",
+      "ja": "YuE2 Studio 1.1：LoRA、学習、サウンド処理",
+      "ko": "YuE2 Studio 1.1: LoRA, 학습, 사운드 처리"
+    },
+    "body": {
+      "en": "LoRA arrive: styles, artists, sound and sliders, each with its own strength for the composition and for the sound. Take them from the built-in catalogue, find them on Hugging Face right on the LoRA page or paste a link, or import your own files. Instrumental is back, this time for real: with the Instrumental LoRA the vocal stem of a song drops to silence while drums and bass stay as they were. New sound processing for finished tracks: noise reduction, Spectral Lifter, vocal naturalizer and mastering to a reference track, heard before and after, kept as versions next to the untouched original. MP3 is now made by LAME, the reference encoder, straight from the model's lossless output. Train your own LoRA right in the studio: 5–20 songs of one artist or style, HOT-Step's trainer and its tuned recipe with lyric timing (Russian included), every setting editable, the finished checkpoints in the LoRA library in one click. The assistant fills in the lyrics by ear, and datasets move between this studio and MiniMax Music3 Studio. Processing also runs your own VST3 plugins in a chain, each set up in its own window.",
+      "ru": "Появились LoRA: стили, артисты, звучание и слайдеры, у каждой своя сила для композиции и для звука. Их можно взять из встроенного каталога, найти на Hugging Face прямо на странице LoRA или вставить ссылку, а можно импортировать свои файлы. Инструментал вернулся, теперь по-настоящему: с LoRA «Инструментал» вокальная дорожка песни уходит в тишину, а барабаны и бас остаются прежними. Новая обработка готовых треков: шумоподавление, Spectral Lifter, очеловечивание вокала и мастеринг по эталонному треку, с прослушиванием «до/после» и сохранением версиями рядом с нетронутым оригиналом. MP3 теперь делает LAME, эталонный кодировщик, прямо из выхода модели без потерь. Свою LoRA теперь можно обучить прямо в студии: 5–20 песен одного артиста или стиля, тренер HOT-Step с его выверенным рецептом и таймингом текста (русский тоже), все настройки можно менять, готовые точки уходят в библиотеку LoRA одним кликом. Текст песен ассистент заполняет на слух, а датасеты переносятся между этой студией и MiniMax Music3 Studio. В обработке — ещё и ваши VST3-плагины цепочкой, каждый настраивается в своём окне.",
+      "zh": "新增 LoRA：风格、艺人、音色和滑块，每个都可分别设置对作曲和声音的强度。可以从内置目录获取，在 LoRA 页面直接搜索 Hugging Face 或粘贴链接，也可以导入自己的文件。纯音乐回来了，这次是真的：使用「纯音乐」LoRA 后，歌曲的人声分轨降为静音，鼓和贝斯保持不变。新增成品处理：降噪、Spectral Lifter、人声自然化和按参考曲目母带处理，可对比前后试听，并作为版本保存在未改动的原曲旁边。MP3 现在由参考级编码器 LAME 直接从模型的无损输出编码。 现在可以直接在工作室里训练自己的 LoRA：同一歌手或风格的 5–20 首歌，使用 HOT-Step 的训练器及其调好的配方和歌词对齐（包括俄语），所有设置都可修改，训练出的检查点一键加入 LoRA 库。助手会听写歌词，数据集可在本工作室与 MiniMax Music3 Studio 之间迁移。处理功能还支持串联你自己的 VST3 插件，每个插件在自己的窗口中设置。",
+      "ja": "LoRA に対応しました。スタイル、アーティスト、音色、スライダーがあり、作曲と音それぞれに強さを設定できます。内蔵カタログから入手するか、LoRA ページで Hugging Face を直接検索、またはリンクを貼り付け、自分のファイルを読み込むこともできます。インストが今度こそ本当に戻りました。「インスト」LoRA を使うと曲のボーカルステムが無音になり、ドラムとベースはそのままです。完成曲の新しいサウンド処理：ノイズ除去、Spectral Lifter、ボーカルの自然化、リファレンス曲に合わせたマスタリング。前後を聴き比べ、手を付けていない原曲の隣にバージョンとして保存できます。MP3 はモデルのロスレス出力から、リファレンスエンコーダー LAME で直接作成されるようになりました。 スタジオ内で自分の LoRA を学習できるようになりました。同じアーティストやスタイルの 5〜20 曲、HOT-Step のトレーナーと調整済みレシピ、歌詞のタイミング合わせ（ロシア語も対応）。設定はすべて変更でき、できたチェックポイントはワンクリックで LoRA ライブラリへ。歌詞はアシスタントが聞き取って入力し、データセットはこのスタジオと MiniMax Music3 Studio の間で移せます。処理では自分の VST3 プラグインもチェーンで使え、それぞれ専用ウィンドウで設定します。",
+      "ko": "LoRA가 추가되었습니다. 스타일, 아티스트, 사운드, 슬라이더가 있으며 각각 작곡과 사운드에 대한 강도를 따로 정할 수 있습니다. 내장 카탈로그에서 받거나, LoRA 페이지에서 Hugging Face를 바로 검색하거나 링크를 붙여넣고, 직접 가진 파일을 가져올 수도 있습니다. 연주곡이 이번에는 제대로 돌아왔습니다. '연주곡' LoRA를 쓰면 곡의 보컬 스템이 무음이 되고 드럼과 베이스는 그대로 남습니다. 완성곡을 위한 새 사운드 처리: 노이즈 감소, Spectral Lifter, 보컬 자연화, 레퍼런스 곡 기준 마스터링을 전후 비교로 들어보고, 손대지 않은 원본 옆에 버전으로 저장합니다. MP3는 이제 기준 인코더 LAME이 모델의 무손실 출력에서 바로 만듭니다. 이제 스튜디오에서 직접 나만의 LoRA를 학습할 수 있습니다. 한 아티스트나 스타일의 곡 5–20개, HOT-Step의 트레이너와 다듬어진 레시피, 가사 타이밍 정렬(러시아어 포함). 모든 설정을 바꿀 수 있고, 완성된 체크포인트는 한 번의 클릭으로 LoRA 라이브러리에 들어갑니다. 가사는 어시스턴트가 듣고 채우며, 데이터셋은 이 스튜디오와 MiniMax Music3 Studio 사이를 오갑니다. 처리에서는 내 VST3 플러그인도 체인으로 쓸 수 있고, 각각 자체 창에서 설정합니다."
+    },
+    "tags": [
+      "YuE2",
+      "1.1",
+      "LoRA",
+      "training"
+    ]
+  },
+  {
+    "id": "yue2-studio-1-0-1",
+    "date": "2026-09-23",
+    "title": {
+      "en": "YuE2 Studio 1.0.1",
+      "ru": "YuE2 Studio 1.0.1",
+      "zh": "YuE2 Studio 1.0.1",
+      "ja": "YuE2 Studio 1.0.1",
+      "ko": "YuE2 Studio 1.0.1"
+    },
+    "body": {
+      "en": "Cover mode now plays the recording you chose, with a waveform you can click to seek. The Instrumental switch is gone: YuE2 sings whatever it is given and makes words up for empty lyrics, so the switch promised what the model does not do. Deleting a song now also removes its audio, stems and cover from disk.",
+      "ru": "В режиме кавера выбранную запись теперь можно прослушать: плеер с волной, клик по волне перематывает. Переключатель «Инструментал» убран: YuE2 поёт всегда, а на пустой текст сама сочиняет слова, так что переключатель обещал то, чего модель не умеет. Удаление песни теперь стирает с диска и её аудио, дорожки и обложку.",
+      "zh": "翻唱模式现在可以试听所选录音，带波形播放器，点击波形即可跳转。已移除“纯音乐”开关：YuE2 总会演唱，歌词为空时会自己编词，这个开关承诺了模型做不到的事。删除歌曲时现在也会从磁盘删除其音频、分轨和封面。",
+      "ja": "カバーモードで選んだ録音を試聴できるようになりました。波形プレーヤー付きで、波形をクリックするとシークします。「インスト」スイッチは削除しました。YuE2 は常に歌い、歌詞が空だと自分で言葉を作るため、モデルにできないことを約束していました。曲を削除すると、音声・ステム・カバー画像もディスクから削除されます。",
+      "ko": "커버 모드에서 선택한 녹음을 들어볼 수 있습니다. 파형 플레이어가 있고 파형을 클릭하면 이동합니다. '연주곡' 스위치는 제거했습니다. YuE2는 항상 노래하며 가사가 비어 있으면 스스로 가사를 만들어 내므로, 모델이 할 수 없는 것을 약속하고 있었습니다. 곡을 삭제하면 오디오, 스템, 커버도 디스크에서 삭제됩니다."
+    },
+    "tags": [
+      "YuE2",
+      "1.0.1"
+    ]
+  },
+  {
+    "id": "yue2-studio-1-0",
+    "date": "2026-09-23",
+    "title": {
+      "en": "YuE2 Studio 1.0",
+      "ru": "YuE2 Studio 1.0",
+      "zh": "YuE2 Studio 1.0",
+      "ja": "YuE2 Studio 1.0",
+      "ko": "YuE2 Studio 1.0"
+    },
+    "body": {
+      "en": "A studio for YuE2, the open song model that writes a score before it sings. Style and lyrics in, a full song with vocals out, up to six minutes, rendered on your own card by yue2.cpp. One executable, no Python; the installed version updates itself, the portable one keeps everything in its own folder.",
+      "ru": "Студия для YuE2 — открытой модели, которая сначала пишет партитуру, а потом поёт. На входе стиль и текст, на выходе целая песня с вокалом до шести минут, рендер на вашей карте через yue2.cpp. Один exe, без Python; установленная версия обновляется сама, портативная держит всё в своей папке.",
+      "zh": "为 YuE2 打造的工作室。YuE2 是一个先写乐谱再演唱的开源歌曲模型。输入风格和歌词，输出最长六分钟、带人声的完整歌曲，由 yue2.cpp 在你的显卡上渲染。单个可执行文件，无需 Python；安装版会自动更新，便携版把一切保存在自己的文件夹里。",
+      "ja": "歌う前に楽譜を書くオープンなソングモデル YuE2 のためのスタジオです。スタイルと歌詞から、最長 6 分のボーカル入りフルソングを yue2.cpp があなたのカードでレンダリングします。単一の実行ファイルで Python は不要。インストール版は自動更新、ポータブル版はすべてを自分のフォルダーに保存します。",
+      "ko": "노래하기 전에 악보부터 쓰는 오픈 노래 모델 YuE2를 위한 스튜디오입니다. 스타일과 가사를 넣으면 최대 6분의 보컬이 있는 완성곡이 나오고, yue2.cpp가 내 그래픽카드에서 렌더링합니다. 실행 파일 하나, Python 없음. 설치판은 스스로 업데이트되고 포터블판은 모든 것을 자기 폴더에 둡니다."
+    },
+    "tags": [
+      "YuE2",
+      "yue2.cpp",
+      "1.0"
+    ]
+  },
+  {
+    "id": "yue2-any-gpu",
+    "date": "2026-09-23",
+    "title": {
+      "en": "CUDA, Vulkan, processor",
+      "ru": "CUDA, Vulkan, процессор",
+      "zh": "CUDA、Vulkan、处理器",
+      "ja": "CUDA・Vulkan・プロセッサ",
+      "ko": "CUDA, Vulkan, 프로세서"
+    },
+    "body": {
+      "en": "The engine carries CUDA, Vulkan and processor backends and picks the best one it finds: CUDA on NVIDIA, Vulkan elsewhere, the processor without a GPU; Settings → Local engine lets you choose. Vulkan is verified on NVIDIA; on AMD and Intel it is experimental - AMD Radeon integrated graphics gave unintelligible vocals in our test, and discrete cards are untested. Owners, tell us how it goes.",
+      "ru": "В движке есть бэкенды CUDA, Vulkan и процессор, и он сам берёт лучший: CUDA на NVIDIA, Vulkan на остальных, процессор без видеокарты; в «Настройки → Локальный движок» можно выбрать вручную. Vulkan проверен на NVIDIA; на AMD и Intel он экспериментальный — на встроенной AMD Radeon вокал вышел неразборчивым, дискретные карты не проверены. Владельцы — расскажите, как работает.",
+      "zh": "引擎内置 CUDA、Vulkan 和处理器后端并自动选择最佳者：NVIDIA 用 CUDA，其他显卡用 Vulkan，没有显卡时用处理器；也可在“设置 → 本地引擎”中手动选择。Vulkan 已在 NVIDIA 上验证；在 AMD 和 Intel 上属实验性质——在 AMD Radeon 集成显卡上人声无法辨认，独立显卡尚未测试。欢迎反馈。",
+      "ja": "エンジンは CUDA、Vulkan、プロセッサのバックエンドを備え、最適なものを自動選択します。NVIDIA は CUDA、それ以外は Vulkan、GPU がなければプロセッサ。「設定 → ローカルエンジン」で手動選択もできます。Vulkan は NVIDIA で確認済みですが、AMD と Intel では実験的です。AMD Radeon 内蔵グラフィックスではボーカルが聞き取れず、単体カードは未検証です。結果をぜひ教えてください。",
+      "ko": "엔진에는 CUDA, Vulkan, 프로세서 백엔드가 있고 가장 좋은 것을 고릅니다. NVIDIA는 CUDA, 그 밖에는 Vulkan, 그래픽카드가 없으면 프로세서이며 '설정 → 로컬 엔진'에서 직접 고를 수 있습니다. Vulkan은 NVIDIA에서 확인했고 AMD와 Intel에서는 실험적입니다. AMD Radeon 내장 그래픽에서는 보컬을 알아들을 수 없었고 외장 카드는 검증하지 않았습니다. 사용 후기를 알려 주세요."
+    },
+    "tags": [
+      "Vulkan",
+      "AMD",
+      "Intel",
+      "CUDA"
+    ]
+  },
+  {
+    "id": "yue2-score",
+    "date": "2026-09-23",
+    "title": {
+      "en": "The score is yours to edit",
+      "ru": "Партитуру можно править",
+      "zh": "乐谱由你编辑",
+      "ja": "楽譜は自由に編集できます",
+      "ko": "악보는 직접 고칠 수 있습니다"
+    },
+    "body": {
+      "en": "Every song comes back with the ABC score it was sung from, engraved as sheet music. Change notes, tempo or key and create again: the composition stays, the performance changes. Compose the score shows it in seconds, before anything is sung - the studio's take on yue2.cpp's yue-plan.",
+      "ru": "Каждая песня возвращается с партитурой ABC, по которой она спета, — нотами на экране. Поменяйте ноты, темп или тональность и создайте снова: композиция остаётся, меняется исполнение. «Сочинить партитуру» покажет её за секунды, ещё до пения, — это аналог yue-plan из yue2.cpp.",
+      "zh": "每首歌都会附带演唱所依据的 ABC 乐谱，并以五线谱显示。修改音符、速度或调性后再次创作：作品保持不变，演绎随之改变。“创作乐谱”能在演唱前几秒内给出乐谱，相当于 yue2.cpp 的 yue-plan。",
+      "ja": "すべての曲は、歌のもとになった ABC 楽譜つきで返り、楽譜として表示されます。音符、テンポ、キーを変えてもう一度作成すると、曲はそのままに演奏が変わります。「楽譜を作曲」なら歌う前に数秒で楽譜が見られます。yue2.cpp の yue-plan に相当します。",
+      "ko": "모든 곡은 노래의 바탕이 된 ABC 악보와 함께 돌아오고, 악보로 그려집니다. 음표, 템포, 조성을 바꿔 다시 만들면 곡은 그대로, 연주가 바뀝니다. '악보 작곡'은 노래하기 전에 몇 초 만에 악보를 보여 줍니다. yue2.cpp의 yue-plan에 해당합니다."
+    },
+    "tags": [
+      "ABC",
+      "score"
+    ]
+  },
+  {
+    "id": "yue2-covers",
+    "date": "2026-09-23",
+    "title": {
+      "en": "Covers with SheetSage2",
+      "ru": "Каверы через SheetSage2",
+      "zh": "用 SheetSage2 翻唱",
+      "ja": "SheetSage2 でカバー",
+      "ko": "SheetSage2로 커버"
+    },
+    "body": {
+      "en": "SheetSage2 listens to a recording and writes its melody down; YuE2 sings that melody with your lyrics in your style. Pick a file in the Cover tab, or transcribe any track from its menu - melody only for covers, or with chords.",
+      "ru": "SheetSage2 слушает запись и записывает её мелодию, YuE2 поёт эту мелодию с вашим текстом в вашем стиле. Выберите файл во вкладке «Кавер» или транскрибируйте любой трек из его меню — только мелодию для кавера или с аккордами.",
+      "zh": "SheetSage2 聆听录音并记下旋律，YuE2 用你的歌词和风格演唱这段旋律。在“翻唱”标签中选择文件，或从任意曲目的菜单中转写——翻唱只取旋律，也可带和弦。",
+      "ja": "SheetSage2 が録音を聴いてメロディを書き起こし、YuE2 があなたの歌詞とスタイルでそのメロディを歌います。「カバー」タブでファイルを選ぶか、任意のトラックのメニューから書き起こします。カバー用のメロディのみ、またはコードつき。",
+      "ko": "SheetSage2가 녹음을 듣고 멜로디를 받아 적으면, YuE2가 그 멜로디를 내 가사와 스타일로 부릅니다. '커버' 탭에서 파일을 고르거나 아무 트랙의 메뉴에서 채보하세요. 커버용 멜로디만, 또는 코드까지."
+    },
+    "tags": [
+      "SheetSage2",
+      "cover"
+    ]
+  },
+  {
+    "id": "yue2-engine-parity",
+    "date": "2026-09-23",
+    "title": {
+      "en": "Everything the engine can do",
+      "ru": "Всё, что умеет движок",
+      "zh": "引擎的全部能力",
+      "ja": "エンジンのすべての機能",
+      "ko": "엔진이 할 수 있는 모든 것"
+    },
+    "body": {
+      "en": "All seven sampling knobs for both stages, guidance, both seeds, flow-matching steps, batches and variations, peak normalisation, MP3 or WAV. Prompts open and save as JSON or YAML in yue2.cpp's own request format, and a prompt that carries audio codes asks whether to render the same take again or sing a new one - as the engine's WebUI does.",
+      "ru": "Все семь параметров сэмплинга для обеих стадий, guidance, оба сида, шаги flow matching, пачки и вариации, нормализация пика, MP3 или WAV. Промпты открываются и сохраняются в JSON или YAML в формате запросов yue2.cpp, а промпт с аудиокодами спросит, отрендерить тот же дубль или спеть новый, — как в WebUI движка.",
+      "zh": "两个阶段的全部七个采样参数、引导强度、两个种子、流匹配步数、批量与变体、峰值归一化、MP3 或 WAV。提示词可按 yue2.cpp 自己的请求格式以 JSON 或 YAML 打开和保存；带音频编码的提示词会询问是重新渲染同一版还是重新演唱——与引擎的 WebUI 一致。",
+      "ja": "両ステージの 7 つのサンプリング設定、ガイダンス、2 つのシード、フローマッチングのステップ、バッチとバリエーション、ピーク正規化、MP3 または WAV。プロンプトは yue2.cpp のリクエスト形式で JSON または YAML として開いて保存でき、オーディオコードを含むプロンプトは、同じテイクを再レンダリングするか新たに歌うかを尋ねます。エンジンの WebUI と同じです。",
+      "ko": "두 단계의 샘플링 설정 일곱 가지, 가이던스, 두 시드, 플로 매칭 스텝, 배치와 변주, 피크 정규화, MP3 또는 WAV. 프롬프트는 yue2.cpp의 요청 형식으로 JSON 또는 YAML로 열고 저장하며, 오디오 코드가 담긴 프롬프트는 같은 테이크를 다시 렌더링할지 새로 부를지 묻습니다. 엔진의 WebUI와 같습니다."
+    },
+    "tags": [
+      "yue2.cpp",
+      "YAML",
+      "replay"
+    ]
+  }
+]
